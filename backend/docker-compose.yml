@@ -1,0 +1,46 @@
+# Usage local / développement.
+# Démarre MySQL + l'API construite depuis le Dockerfile local.
+# Pour développer avec le rechargement à chaud (npm run start:dev), il est aussi possible
+# de ne lancer que le service "db" (docker compose up db) et de faire tourner l'API en
+# dehors de Docker, en pointant DB_HOST=localhost dans le .env.
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-frejus}
+      MYSQL_USER: ${DB_USERNAME:-frejus}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-frejus}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+    ports:
+      - '3306:3306'
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      target: production
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+    ports:
+      - '3000:3000'
+    volumes:
+      - uploads_data:/app/uploads
+
+volumes:
+  db_data:
+  uploads_data:

@@ -1,0 +1,45 @@
+# Usage VPS / production.
+# Ne construit pas l'image : elle est récupérée depuis le registre GitHub Container
+# Registry (GHCR), publiée par le pipeline CI/CD (.github/workflows/backend-ci-cd.yml).
+# A copier sur le VPS à côté d'un fichier .env (non commité, voir .env.example).
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: ${BACKEND_IMAGE:-ghcr.io/OWNER/frejus-backend:latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      # DB_SYNCHRONIZE reste piloté par le .env du VPS (true tant qu'il n'y a pas de
+      # vraies migrations TypeORM — voir docs/ANALYSE-PLAN-BACKEND.md, "Points d'attention").
+      # Ne PAS passer à false sans avoir mis en place les migrations, sous peine de
+      # démarrer l'API sur une base sans les tables attendues.
+    ports:
+      - '3000:3000'
+    volumes:
+      - uploads_data:/app/uploads
+
+volumes:
+  db_data:
+  uploads_data:

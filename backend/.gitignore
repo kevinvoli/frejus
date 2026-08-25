@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+*.log
+.env
+.env.*.local
+
+# Images uploadées en local (le contenu réel vit sur le volume Docker en prod)
+uploads/*
+!uploads/.gitkeep

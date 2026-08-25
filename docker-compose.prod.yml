@@ -1,0 +1,59 @@
+# Usage VPS / production.
+# Ce fichier orchestre TOUS les services déployés sur le VPS (backend + admin, qui
+# partagent le même serveur — voir docs/ANALYSE-PLAN-BACKEND.md). Il vit à la racine
+# du dépôt (et non dans backend/) car il n'est plus spécifique à un seul projet.
+#
+# Ne construit aucune image : elles sont récupérées depuis le GitHub Container
+# Registry (GHCR), publiées par les pipelines CI/CD (.github/workflows/backend-ci-cd.yml
+# et admin-ci-cd.yml, chacun déclenché uniquement par les changements de son dossier).
+#
+# A copier sur le VPS à côté d'un fichier .env (non commité, voir backend/.env.example).
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: ${BACKEND_IMAGE:-ghcr.io/OWNER/frejus-backend:latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      # DB_SYNCHRONIZE reste piloté par le .env du VPS (true tant qu'il n'y a pas de
+      # vraies migrations TypeORM — voir docs/ANALYSE-PLAN-BACKEND.md, "Points d'attention").
+      # Ne PAS passer à false sans avoir mis en place les migrations, sous peine de
+      # démarrer l'API sur une base sans les tables attendues.
+    ports:
+      - '3000:3000'
+    volumes:
+      - uploads_data:/app/uploads
+
+  admin:
+    image: ${ADMIN_IMAGE:-ghcr.io/OWNER/frejus-admin:latest}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '8080:80'
+
+volumes:
+  db_data:
+  uploads_data:
