@@ -22,7 +22,9 @@ fi
 echo "==> Mise à jour du système"
 apt-get update -y
 apt-get upgrade -y
-apt-get install -y ca-certificates curl gnupg ufw nginx certbot python3-certbot-nginx
+# gettext-base fournit envsubst, dont nginx-apply.sh dépend pour générer la conf.
+apt-get install -y ca-certificates curl gnupg ufw gettext-base \
+                   nginx certbot python3-certbot-nginx
 
 echo "==> Installation de Docker Engine + Compose plugin"
 if ! command -v docker >/dev/null 2>&1; then
