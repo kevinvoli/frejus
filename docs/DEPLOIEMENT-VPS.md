@@ -60,8 +60,9 @@ que 22, 80 et 443.
 └── backups/
 ```
 
-Tout ce qui est versionné vit dans `deploy/` du dépôt et se synchronise sur `/opt`
-via le pipeline **Infra CI/CD**. Seuls les deux `.env` et `data/` sont propres au VPS.
+Tout ce qui est versionné vit dans `deploy/` du dépôt et se synchronise sur `/opt` via
+le pipeline CI/CD lorsque `deploy/**` change. Seuls les deux `.env` et `data/` sont
+propres au VPS.
 
 
 ---
@@ -143,7 +144,8 @@ scp -i ~/.ssh/frejus_deploy -r deploy/apps/frejus/. deploy@IP_DU_VPS:/opt/apps/f
 scp -i ~/.ssh/frejus_deploy -r deploy/infrastructure/. deploy@IP_DU_VPS:/opt/infrastructure/
 ```
 
-Les fois suivantes, c'est le pipeline **Infra CI/CD** qui s'en charge automatiquement.
+Les fois suivantes, c'est le pipeline CI/CD qui s'en charge : tout push touchant
+`deploy/**` resynchronise `/opt`.
 
 ## 5. MySQL mutualisé
 
@@ -249,7 +251,7 @@ Côté GitHub, les trois variables de build valent :
 3. `sudo /opt/infrastructure/nginx/tls-setup.sh`
 4. `sudo ufw delete allow 8080/tcp`
 5. Mettre à jour les trois variables `VITE_*` en `https://…` et **relancer les
-   pipelines Frontend et Admin** : ces URL sont gravées dans les bundles au build.
+   pipeline CI/CD** pour `frontend` et `admin` : ces URL sont gravées dans les bundles.
 
 ## 8. Secrets et variables GitHub
 
@@ -288,7 +290,7 @@ avertissement, les images restant construites et publiées sur GHCR :
 > du build. Tant qu'elles ne sont pas renseignées, les images se construisent et se
 > déploient, mais le site et l'admin appelleront `localhost` et ne verront jamais
 > l'API : le site n'affichera que son contenu de repli. Les renseigner impose de
-> relancer les pipelines concernés — éditer le `.env` du VPS ne suffit pas.
+> relancer le pipeline pour les composants concernés — éditer le `.env` du VPS ne suffit pas.
 
 **Sur les images GHCR** : un package publié depuis un dépôt privé est privé par
 défaut, et le VPS ne pourra pas le `pull` sans `GHCR_USERNAME` / `GHCR_TOKEN`. Le plus
@@ -298,15 +300,16 @@ simple est de rendre les trois packages publics une fois créés
 
 ### Tester le pipeline avant que le VPS soit prêt
 
-Les jobs `test` et `build-and-push` ne dépendent d'aucun secret VPS : on peut les
-valider seuls via *Actions* -> le workflow -> *Run workflow*. Le job `deploy` échouera
-avec un message explicite tant que `/opt/apps/frejus` n'existe pas sur le VPS.
+Le job `build` ne dépend d'aucun secret VPS : il se valide seul via *Actions* ->
+*CI/CD* -> *Run workflow*. Sans `VPS_HOST`, le job `deploy` se contente d'un
+avertissement et les images restent publiées sur GHCR ; avec `VPS_HOST` mais sans
+`/opt/apps/frejus` sur le VPS, il échoue avec un message explicite.
 
 ## 9. Premier déploiement
 
-1. Lancer les trois pipelines à la main (*Actions* -> workflow -> *Run workflow*), dans
-   l'ordre **Backend**, **Admin**, **Frontend**. Chacun construit son image, la publie
-   sur GHCR et appelle `deploy.sh` sur le VPS.
+1. *Actions* -> *CI/CD* -> *Run workflow*, composants = **tout**. Les trois images sont
+   construites en parallèle, publiées sur GHCR, puis `deploy.sh` est appelé sur le VPS
+   pour chacune (`api`, `web`, `admin`).
 2. Vérifier sur le VPS :
 
 ```bash
@@ -332,14 +335,23 @@ docker compose logs -f api
 
 ## 10. Déploiements suivants
 
-Automatiques : chaque push sur `master` ne déclenche que le pipeline concerné.
+Automatiques : chaque push sur `master` déclenche le pipeline CI/CD, qui compare le
+commit précédent au nouveau et ne traite que les composants concernés. Plusieurs
+composants modifiés dans le même push sont construits en parallèle, puis déployés en
+une seule session SSH.
 
-| Chemin modifié | Workflow | Effet sur le VPS |
-|---|---|---|
-| `frontend/**` | Frontend CI/CD | `deploy.sh web <image>` |
-| `backend/**` | Backend CI/CD | `deploy.sh api <image>` |
-| `admin/**` | Admin CI/CD | `deploy.sh admin <image>` |
-| `deploy/**` | Infra CI/CD | `scp` vers `/opt` + `nginx-apply.sh` + `deploy.sh` |
+| Chemin modifié | Effet sur le VPS |
+|---|---|
+| `frontend/**` | `deploy.sh web <image>` |
+| `backend/**` | `deploy.sh api <image>` |
+| `admin/**` | `deploy.sh admin <image>` |
+| `deploy/**` | `scp` vers `/opt` + `nginx-apply.sh` + `deploy.sh` |
+| `.github/workflows/ci-cd.yml` | tout : impossible de savoir quel composant est affecté |
+| autre (docs, README...) | rien |
+
+Pour forcer une reconstruction sans changement de code — nouvelle valeur de
+`FRONTEND_VITE_API_URL`, par exemple — passer par *Actions* -> *CI/CD* ->
+*Run workflow* et choisir le composant.
 
 `deploy.sh` écrit le tag déployé (`<image>:<sha>`) dans le `.env` : un
 `docker compose up -d` manuel lancé plus tard ne fait jamais revenir à une version

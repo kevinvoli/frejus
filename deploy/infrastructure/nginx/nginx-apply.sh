@@ -20,7 +20,7 @@ set -euo pipefail
 
 NGINX_DIR="${NGINX_DIR:-/opt/infrastructure/nginx}"
 # Dossier applicatif : doit correspondre au secret GitHub VPS_APP_PATH. Le pipeline
-# Infra CI/CD le transmet ; en usage manuel le défaut suffit.
+# CI/CD le transmet ; en usage manuel le défaut suffit.
 APP_DIR="${APP_DIR:-/opt/apps/frejus}"
 APP_ENV="${APP_ENV:-${APP_DIR}/.env}"
 TARGET=/etc/nginx/sites-available/frejus.conf

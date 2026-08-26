@@ -94,7 +94,7 @@ for f in "$APP_DIR/docker-compose.yml" "$APP_DIR/deploy.sh" \
   if [ -f "$f" ]; then
     ok "$f"
   else
-    warn "$f absent — sera copié par le pipeline Infra CI/CD (ou par scp)"
+    warn "$f absent — sera copié par le pipeline CI/CD (ou par scp)"
   fi
 done
 [ -x "$APP_DIR/deploy.sh" ] 2>/dev/null && ok "deploy.sh est exécutable" \

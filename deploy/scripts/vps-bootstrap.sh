@@ -52,7 +52,7 @@ chown "$DEPLOY_USER:$DEPLOY_USER" "/home/${DEPLOY_USER}/.ssh/authorized_keys"
 chmod 600 "/home/${DEPLOY_USER}/.ssh/authorized_keys"
 
 # nginx-apply.sh écrit dans /etc/nginx et recharge le service : l'utilisateur deploy
-# doit pouvoir le lancer sans mot de passe pour que le pipeline Infra CI/CD applique la
+# doit pouvoir le lancer sans mot de passe pour que le pipeline CI/CD applique la
 # conf après un scp. Ce n'est pas un affaiblissement : deploy est membre du groupe
 # docker, ce qui équivaut déjà à un accès root sur cette machine.
 cat > /etc/sudoers.d/${DEPLOY_USER}-nginx <<SUDO

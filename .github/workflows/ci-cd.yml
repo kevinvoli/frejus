@@ -1,0 +1,352 @@
+name: CI/CD
+
+# Pipeline unique du dépôt. Un push sur master ne construit et ne redéploie que les
+# composants dont les fichiers ont changé :
+#
+#   backend/**   -> image frejus-backend   -> service "api"
+#   frontend/**  -> image frejus-frontend  -> service "web"
+#   admin/**     -> image frejus-admin     -> service "admin"
+#   deploy/**    -> synchronisation de /opt sur le VPS + rechargement de Nginx
+#
+#   changes -> build (un job de matrice par composant modifié) -> deploy
+#
+# Modifier ce fichier reconstruit les trois images : on ne peut pas savoir lequel des
+# composants est affecté par un changement de pipeline.
+#
+# Secrets requis (Settings > Secrets and variables > Actions) :
+#   VPS_HOST      adresse IP ou nom d'hôte du VPS
+#   VPS_USER      utilisateur SSH de déploiement
+#   VPS_SSH_KEY   clé privée SSH correspondante (sans passphrase)
+#
+# Secrets ou variables facultatifs :
+#   VPS_PORT      port SSH                        (défaut : 22)
+#   VPS_APP_PATH  dossier applicatif sur le VPS   (défaut : /opt/apps/frejus)
+#   GHCR_USERNAME / GHCR_TOKEN   seulement si les packages GHCR restent privés
+#
+# URL gravées en dur dans les bundles par Vite : les changer impose de relancer ce
+# pipeline (« Run workflow »), éditer le .env du VPS ne suffit pas.
+#   FRONTEND_VITE_API_URL       ex : http://203.0.113.10/api
+#   ADMIN_VITE_API_URL          ex : http://203.0.113.10/api
+#   ADMIN_VITE_FRONTEND_URL     ex : http://203.0.113.10
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      cible:
+        description: "Composants à construire et déployer"
+        type: choice
+        default: tout
+        options:
+          - tout
+          - backend
+          - frontend
+          - admin
+          - infra
+
+# Deux déploiements simultanés sur le même VPS se marcheraient dessus. On ne coupe
+# pas celui en cours : il est peut-être en train d'écrire le .env du VPS.
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    name: Composants concernés
+    runs-on: ubuntu-latest
+    outputs:
+      # Tableau JSON d'objets, consommé par la matrice du job « build ».
+      apps: ${{ steps.detect.outputs.apps }}
+      # "service=image:tag" séparés par des espaces, consommé par le job « deploy ».
+      targets: ${{ steps.detect.outputs.targets }}
+      infra: ${{ steps.detect.outputs.infra }}
+      owner: ${{ steps.detect.outputs.owner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # Il faut le commit précédent pour calculer le diff.
+          fetch-depth: 0
+
+      - name: Détecter les composants modifiés
+        id: detect
+        env:
+          EVENT: ${{ github.event_name }}
+          CIBLE: ${{ inputs.cible }}
+          BEFORE: ${{ github.event.before }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+
+          # GHCR n'accepte que des minuscules dans le chemin de l'image.
+          OWNER_LC="$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')"
+
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            CHANGED=''
+            FORCE="${CIBLE:-tout}"
+          else
+            FORCE=''
+            # Premier push sur la branche, force-push, ou historique tronqué : on ne
+            # peut pas calculer de diff fiable, donc on reconstruit tout.
+            if [ -z "$BEFORE" ] \
+               || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+               || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              FORCE=tout
+              CHANGED=''
+            else
+              CHANGED="$(git diff --name-only "$BEFORE" "$GITHUB_SHA")"
+            fi
+          fi
+
+          # Un changement du pipeline lui-même concerne potentiellement tout le monde.
+          if printf '%s\n' "$CHANGED" | grep -qx '.github/workflows/ci-cd.yml'; then
+            FORCE=tout
+          fi
+
+          # L'option « infra » du menu Run workflow designe le dossier deploy/.
+          [ "$FORCE" = "infra" ] && FORCE=deploy
+
+          selected() {
+            case "$FORCE" in
+              tout)  return 0 ;;
+              "")    printf '%s\n' "$CHANGED" | grep -qE "^$1/" ;;
+              *)     [ "$FORCE" = "$1" ] ;;
+            esac
+          }
+
+          APPS='['
+          TARGETS=''
+          SEP=''
+          for dir in backend frontend admin; do
+            selected "$dir" || continue
+            case "$dir" in
+              backend)  label='Backend (NestJS)'; service=api;   image=frejus-backend;  lint=true;  test=true  ;;
+              frontend) label='Site vitrine';     service=web;   image=frejus-frontend; lint=false; test=false ;;
+              admin)    label='Panneau admin';    service=admin; image=frejus-admin;    lint=true;  test=false ;;
+            esac
+            APPS="${APPS}${SEP}{\"name\":\"${label}\",\"dir\":\"${dir}\",\"service\":\"${service}\",\"image\":\"${image}\",\"lint\":${lint},\"test\":${test}}"
+            SEP=','
+            TARGETS="${TARGETS}${service}=ghcr.io/${OWNER_LC}/${image}:${GITHUB_SHA} "
+          done
+          APPS="${APPS}]"
+
+          if selected deploy; then INFRA=true; else INFRA=false; fi
+
+          {
+            echo "apps=${APPS}"
+            echo "targets=${TARGETS% }"
+            echo "infra=${INFRA}"
+            echo "owner=${OWNER_LC}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Composants : ${APPS}"
+          echo "Infra      : ${INFRA}"
+
+  build:
+    name: ${{ matrix.component.name }}
+    needs: changes
+    if: needs.changes.outputs.apps != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      # Un composant qui échoue ne doit pas empêcher les autres d'être publiés.
+      fail-fast: false
+      matrix:
+        component: ${{ fromJSON(needs.changes.outputs.apps) }}
+    env:
+      IMAGE_NAME: ghcr.io/${{ needs.changes.outputs.owner }}/${{ matrix.component.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.component.dir }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.component.dir }}
+        run: npm ci
+
+      - name: Lint
+        if: matrix.component.lint
+        working-directory: ${{ matrix.component.dir }}
+        run: npm run lint
+
+      - name: Build
+        working-directory: ${{ matrix.component.dir }}
+        # Valeurs sans importance ici : cette étape ne vérifie que la compilation,
+        # l'image publiée est reconstruite plus bas avec les vraies URL.
+        env:
+          VITE_API_URL: http://localhost:3000/api
+          VITE_FRONTEND_URL: http://localhost:5173
+        run: npm run build
+
+      - name: Unit tests
+        if: matrix.component.test
+        working-directory: ${{ matrix.component.dir }}
+        run: npm test -- --ci
+
+      - name: Préparer les build-args
+        id: args
+        if: github.ref == 'refs/heads/master'
+        env:
+          DIR: ${{ matrix.component.dir }}
+          FRONTEND_API: ${{ secrets.FRONTEND_VITE_API_URL || vars.FRONTEND_VITE_API_URL || 'http://localhost:3000/api' }}
+          ADMIN_API: ${{ secrets.ADMIN_VITE_API_URL || vars.ADMIN_VITE_API_URL || 'http://localhost:3000/api' }}
+          ADMIN_FRONTEND: ${{ secrets.ADMIN_VITE_FRONTEND_URL || vars.ADMIN_VITE_FRONTEND_URL || 'http://localhost:5173' }}
+        run: |
+          set -euo pipefail
+          {
+            echo 'value<<GHA_BUILD_ARGS'
+            case "$DIR" in
+              frontend)
+                echo "VITE_API_URL=${FRONTEND_API}"
+                ;;
+              admin)
+                echo "VITE_API_URL=${ADMIN_API}"
+                echo "VITE_FRONTEND_URL=${ADMIN_FRONTEND}"
+                ;;
+            esac
+            echo 'GHA_BUILD_ARGS'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Login to GitHub Container Registry
+        if: github.ref == 'refs/heads/master'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        if: github.ref == 'refs/heads/master'
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.component.dir }}
+          push: true
+          cache-from: type=gha,scope=${{ matrix.component.dir }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component.dir }}
+          build-args: ${{ steps.args.outputs.value }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+  deploy:
+    name: Déploiement sur le VPS
+    needs: [changes, build]
+    # `build` est ignoré quand seul deploy/ a changé : on ne bloque que sur un échec.
+    if: |
+      !cancelled()
+      && github.ref == 'refs/heads/master'
+      && needs.changes.result == 'success'
+      && needs.build.result != 'failure'
+      && (needs.changes.outputs.targets != '' || needs.changes.outputs.infra == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # Le contexte `secrets` n'est pas accessible dans un `if:` de job : la
+      # vérification se fait donc ici et conditionne les steps suivants, pour que le
+      # pipeline reste vert tant que le VPS n'est pas prêt.
+      - name: Vérifier la configuration du VPS
+        id: check
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+        run: |
+          if [ -z "$VPS_HOST" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Secret VPS_HOST absent : déploiement ignoré. Les images restent publiées sur GHCR."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Copier deploy/apps/frejus vers /opt/apps/frejus
+        if: steps.check.outputs.configured == 'true' && needs.changes.outputs.infra == 'true'
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || vars.VPS_PORT || 22 }}
+          source: 'deploy/apps/frejus/*,deploy/apps/frejus/.env.example'
+          target: ${{ secrets.VPS_APP_PATH || vars.VPS_APP_PATH || '/opt/apps/frejus' }}
+          strip_components: 3
+
+      - name: Copier deploy/infrastructure vers /opt/infrastructure
+        if: steps.check.outputs.configured == 'true' && needs.changes.outputs.infra == 'true'
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || vars.VPS_PORT || 22 }}
+          source: 'deploy/infrastructure/*,deploy/infrastructure/mysql/.env.example'
+          target: /opt/infrastructure
+          strip_components: 2
+
+      - name: Appliquer la configuration et redéployer les services
+        if: steps.check.outputs.configured == 'true'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || vars.VPS_PORT || 22 }}
+          envs: APP_PATH,TARGETS,INFRA,GHCR_USERNAME,GHCR_TOKEN
+          script: |
+            set -e
+            if [ ! -d "$APP_PATH" ]; then
+              echo "ERREUR : ${APP_PATH} absent sur le VPS." >&2
+              echo "Lancer d'abord vps-bootstrap.sh puis copier deploy/ (voir docs/DEPLOIEMENT-VPS.md)." >&2
+              exit 1
+            fi
+
+            if [ "$INFRA" = "true" ]; then
+              chmod +x "$APP_PATH"/deploy.sh \
+                       /opt/infrastructure/nginx/*.sh \
+                       /opt/infrastructure/mysql/*.sh 2>/dev/null || true
+
+              # nginx-apply.sh choisit son template depuis NGINX_TEMPLATE du .env et
+              # restaure la configuration précédente si `nginx -t` échoue (cas typique :
+              # template HTTPS appliqué avant que Certbot ait produit les certificats).
+              # Un échec n'interrompt donc pas le pipeline et ne met pas le VPS hors ligne.
+              if [ -f "$APP_PATH/.env" ]; then
+                APP_DIR="$APP_PATH" sudo -n /opt/infrastructure/nginx/nginx-apply.sh \
+                  || echo "::warning::Nginx non rechargé — lancer nginx-apply.sh à la main."
+              else
+                echo "Configuration Nginx ignorée : ${APP_PATH}/.env absent."
+              fi
+            fi
+
+            # Au tout premier passage le .env n'existe pas encore : la synchronisation
+            # des fichiers a quand même réussi, ce n'est donc pas un échec de pipeline.
+            if [ ! -f "$APP_PATH/.env" ]; then
+              echo "::warning::${APP_PATH}/.env absent — stack non démarrée (voir docs/DEPLOIEMENT-VPS.md, étape 6)."
+              exit 0
+            fi
+
+            cd "$APP_PATH"
+            chmod +x deploy.sh
+
+            if [ -n "$TARGETS" ]; then
+              for target in $TARGETS; do
+                ./deploy.sh "${target%%=*}" "${target#*=}"
+              done
+            else
+              # Seule l'infra a changé : on relance la stack avec les tags déjà en place.
+              ./deploy.sh
+            fi
+        env:
+          APP_PATH: ${{ secrets.VPS_APP_PATH || vars.VPS_APP_PATH || '/opt/apps/frejus' }}
+          TARGETS: ${{ needs.changes.outputs.targets }}
+          INFRA: ${{ needs.changes.outputs.infra }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME || vars.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}

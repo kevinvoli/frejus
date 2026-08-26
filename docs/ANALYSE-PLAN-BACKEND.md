@@ -33,9 +33,9 @@ détail des commandes et des routes) :
 - Formulaire de contact fonctionnel côté API (persistance en base + protection anti-spam
   "honeypot"), remplaçant le `alert()` de simulation du frontend actuel.
 - Upload d'images (JPEG/PNG/WEBP/GIF, 8 Mo max) servies en statique par l'API.
-- `Dockerfile`, `docker-compose.yml` (développement local) et `docker-compose.prod.yml`
-  (racine du dépôt, VPS — orchestre `backend/` et `admin/` ensemble, voir plus bas).
-- Pipeline `.github/workflows/backend-ci-cd.yml` : tests + build → image Docker sur GHCR →
+- `Dockerfile`, `docker-compose.yml` (développement local) et `deploy/apps/frejus/docker-compose.yml`
+  (VPS — orchestre `frontend/`, `backend/` et `admin/` ensemble, voir plus bas).
+- Pipeline `.github/workflows/ci-cd.yml`, composant `backend` : tests + build → image Docker sur GHCR →
   déploiement SSH sur le VPS (nécessite de renseigner les secrets GitHub décrits en tête de ce
   fichier de workflow avant que le déploiement automatique fonctionne).
 - Vérification effectuée : build TypeScript, lint et tests unitaires passent ; un test
@@ -55,8 +55,8 @@ détail des commandes et des routes) :
   vider un champ déjà renseigné, l'API distinguant `undefined`/`null` d'une chaîne vide).
 - `Dockerfile` (multi-étapes : build Vite → image nginx statique avec repli SPA
   `try_files ... /index.html`) et `nginx.conf`.
-- Pipeline `.github/workflows/admin-ci-cd.yml` : lint + build → image Docker sur GHCR →
-  déploiement SSH sur le VPS, service `admin` du même `docker-compose.prod.yml` que l'API
+- Pipeline `.github/workflows/ci-cd.yml`, composant `admin` : lint + build → image Docker sur GHCR →
+  déploiement SSH sur le VPS, service `admin` du même `docker-compose.yml` que l'API
   (secrets GitHub à renseigner, dont `ADMIN_VITE_API_URL` car l'URL de l'API est gravée dans le
   build Vite).
 - Vérification effectuée : build TypeScript et lint passent ; le contrat d'API attendu par le
@@ -179,7 +179,7 @@ apparition immédiate dans la grille, retrait d'un mot de passe existant, et les
 page cliente (verrouillée, déverrouillée, introuvable) avec un téléchargement réellement abouti.
 
 **Ce qu'il reste à faire** : ajouter `VITE_FRONTEND_URL` aux secrets GitHub du pipeline
-`admin-ci-cd.yml` (nécessaire pour que le bouton "Copier le lien" du panneau construise la bonne
+`ci-cd.yml` (nécessaire pour que le bouton "Copier le lien" du panneau construise la bonne
 URL en production) ; envisager, si le volume de galeries grandit, un job de nettoyage automatique
 des galeries expirées (actuellement le lien cesse simplement de répondre, les fichiers restent sur
 le disque).
@@ -534,8 +534,8 @@ Compte tenu de la taille actuelle du projet (site vitrine simple, un seul utilis
 - **Stockage images** : disque local du conteneur/VPS via un volume Docker (`uploads_data`), pas de service externe. *(fait — à migrer vers un stockage objet type S3-compatible seulement si le volume de photos grossit beaucoup ou si l'API doit tourner sur plusieurs instances)*
 - **Email** : non implémenté à ce stade — les messages de contact sont stockés en base et consultables via l'API/l'admin ; une notification email (Nodemailer/SMTP) pourra être ajoutée sans changer le contrat d'API.
 - **Authentification admin** : JWT + bcrypt, compte admin auto-créé au premier démarrage depuis les variables d'environnement. *(fait)*
-- **Hébergement backend** : VPS, via Docker + `docker-compose.prod.yml` (racine du dépôt), déployé par le pipeline CI/CD GitHub Actions. *(pipeline prêt — VPS à provisionner et secrets GitHub à renseigner)*
-- **Panneau admin** : React + Vite + TypeScript + Mantine, servi statiquement par nginx dans un conteneur Docker (service `admin`), sur le **même VPS que le backend**, déployé par son propre pipeline CI/CD. *(fait — voir `admin/`)*
+- **Hébergement backend** : VPS, via Docker + `deploy/apps/frejus/docker-compose.yml`, déployé par le pipeline CI/CD GitHub Actions. *(pipeline prêt — VPS à provisionner et secrets GitHub à renseigner)*
+- **Panneau admin** : React + Vite + TypeScript + Mantine, servi statiquement par nginx dans un conteneur Docker (service `admin`), sur le **même VPS que le backend**, déployé par le composant `admin` du pipeline CI/CD. *(fait — voir `admin/`)*
 - **Hébergement frontend** : conserver GitHub Pages pour l'instant (le workflow existant `deploy.yml` n'est pas modifié).
 
 ## 7. Feuille de route par phases
@@ -547,7 +547,7 @@ Compte tenu de la taille actuelle du projet (site vitrine simple, un seul utilis
 | 2 — Frontend dynamique | Remplacement des données codées en dur par des appels API, gestion des états de chargement/erreur, formulaire de contact branché à l'API | **Fait** — voir `frontend/src/api/` et `defaultContent.ts`, vérifié bout-en-bout contre un vrai backend (contenu réel affiché, message de contact retrouvé en base) |
 | 3 — Back-office | Interface d'administration (CRUD contenu, upload d'images) consommant l'API existante | **Fait** — voir `admin/`, build + lint OK, contrat d'API vérifié contre le backend réel ; test navigateur réel encore à faire sur votre machine |
 | 4 — SEO & performance | Meta-données dynamiques, `sitemap.xml`, Open Graph, lazy-loading et optimisation des images, audit Lighthouse | À faire |
-| 5 — Déploiement & CI/CD | Dockerfile, docker-compose (local et VPS), pipelines GitHub Actions (build/tests → image GHCR → déploiement SSH), pour `backend/` et `admin/` | Pipelines et fichiers Docker **prêts** pour les deux projets ; VPS à provisionner et secrets GitHub à renseigner (voir `.github/workflows/backend-ci-cd.yml` et `admin-ci-cd.yml`) ; migrations TypeORM encore à mettre en place avant données réelles |
+| 5 — Déploiement & CI/CD | Dockerfile, docker-compose (local et VPS), pipelines GitHub Actions (build/tests → image GHCR → déploiement SSH), pour `backend/` et `admin/` | Pipelines et fichiers Docker **prêts** pour les deux projets ; VPS à provisionner et secrets GitHub à renseigner (voir `.github/workflows/ci-cd.yml`) ; migrations TypeORM encore à mettre en place avant données réelles |
 | 6 — Recette & mise en production | Tests fonctionnels, correction de l'incohérence de contenu (localisation, coordonnées), formation du client à l'espace admin | À faire |
 
 **Durée totale estimée** : environ 6 à 8 semaines à temps partiel pour une V1 complète (option B), ou 1 à 2 semaines pour un MVP minimal avec l'option A (Supabase + service de formulaire, sans back-office custom).
