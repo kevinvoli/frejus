@@ -69,7 +69,7 @@ L'API joint la base via `DB_NETWORK` (réseau Docker à rejoindre) et `DB_HOST` 
 
 ### `deploy/` — ce qui part sur le VPS, et ce qui n'en part pas
 
-```
+```text
 deploy/
 ├── apps/frejus/            -> synchronisé vers VPS_APP_PATH
 │   ├── docker-compose.yml
@@ -86,7 +86,7 @@ deploy/
 
 Sur le VPS, `VPS_APP_PATH` finit par ressembler à ceci :
 
-```
+```text
 /opt/apps/frejus/
 ├── docker-compose.yml      copiés par le pipeline
 ├── deploy.sh

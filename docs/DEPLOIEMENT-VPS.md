@@ -19,7 +19,7 @@ soit la façon dont Nginx et MySQL sont installés — est décrit dans
 
 ## Architecture
 
-```
+```text
                         INTERNET
                             |
                       80 / 443 (HTTPS si domaine)
@@ -48,7 +48,7 @@ joignables ni depuis Internet ni depuis le réseau local du VPS. Le pare-feu n'o
 
 ## Arborescence du VPS
 
-```
+```text
 $APP/                       <- VPS_APP_PATH, possédé par l'utilisateur de déploiement
 ├── docker-compose.yml      <- copiés par le pipeline, ne pas éditer sur le VPS
 ├── deploy.sh
