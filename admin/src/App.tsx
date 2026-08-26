@@ -8,6 +8,8 @@ import { SpecialtiesPage } from './pages/SpecialtiesPage';
 import { PortfolioPage } from './pages/PortfolioPage';
 import { TestimonialsPage } from './pages/TestimonialsPage';
 import { ContactMessagesPage } from './pages/ContactMessagesPage';
+import { GalleriesPage } from './pages/GalleriesPage';
+import { GalleryDetailPage } from './pages/GalleryDetailPage';
 
 export default function App() {
   return (
@@ -27,6 +29,8 @@ export default function App() {
             <Route path="/specialties" element={<SpecialtiesPage />} />
             <Route path="/portfolio" element={<PortfolioPage />} />
             <Route path="/testimonials" element={<TestimonialsPage />} />
+            <Route path="/galleries" element={<GalleriesPage />} />
+            <Route path="/galleries/:id" element={<GalleryDetailPage />} />
             <Route path="/contact-messages" element={<ContactMessagesPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

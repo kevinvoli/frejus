@@ -73,3 +73,54 @@ export interface ContactMessage {
   status: ContactMessageStatus;
   createdAt: string;
 }
+
+// Médiathèque : galeries privées livrées aux clients (voir
+// backend/src/galleries). `passwordHash` n'est jamais renvoyé par l'API — seul un
+// booléen `hasPassword` indique si la galerie est protégée.
+export const MediaType = {
+  PHOTO: 'photo',
+  VIDEO: 'video',
+} as const;
+export type MediaType = (typeof MediaType)[keyof typeof MediaType];
+
+export interface GalleryMedia {
+  id: number;
+  galleryId: number;
+  type: MediaType;
+  fileUrl: string;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number;
+  order: number;
+  createdAt: string;
+}
+
+// Forme "liste" (GET /galleries) : pas de tableau `media`, juste un compte.
+export interface GalleryListItem {
+  id: number;
+  title: string;
+  clientName: string;
+  clientEmail: string | null;
+  description: string | null;
+  accessToken: string;
+  expiresAt: string | null;
+  mediaCount: number;
+  hasPassword: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Forme "détail" (GET/POST/PUT /galleries/:id) : inclut les médias complets.
+export interface ClientGallery {
+  id: number;
+  title: string;
+  clientName: string;
+  clientEmail: string | null;
+  description: string | null;
+  accessToken: string;
+  expiresAt: string | null;
+  media: GalleryMedia[];
+  hasPassword: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

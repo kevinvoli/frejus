@@ -70,6 +70,61 @@ nav a:hover {
     color: var(--accent);
 }
 
+/* Bouton "Récupérer mes photos" (voir Header.tsx) : un client tape ici le code reçu
+   du photographe pour retrouver uniquement ses propres photos, sans lien à cliquer. */
+.gallery-code-nav-item {
+    position: relative;
+}
+
+.gallery-code-toggle {
+    background: none;
+    border: 1px solid var(--accent);
+    border-radius: 20px;
+    padding: 8px 18px;
+    color: var(--accent);
+    font-weight: 500;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.gallery-code-toggle:hover {
+    background-color: var(--accent);
+    color: var(--blanc);
+}
+
+.gallery-code-form {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    background-color: var(--blanc);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+    border-radius: 5px;
+    padding: 20px;
+    width: 260px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 1001;
+}
+
+.gallery-code-form label {
+    font-size: 0.85rem;
+    color: var(--texte);
+}
+
+.gallery-code-form input {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 2px;
+    font-size: 1rem;
+    text-transform: uppercase;
+}
+
+.gallery-code-form .btn {
+    text-align: center;
+}
+
 /* HERO SECTION */
 .hero {
     height: 100vh;
@@ -405,6 +460,123 @@ footer {
     color: #999;
 }
 
+/* MÉDIATHÈQUE CLIENTE (page /?galerie=<token>, voir GalleryView.tsx) */
+.gallery-view {
+    min-height: 100vh;
+    background-color: var(--gris-clair);
+}
+
+.gallery-header {
+    background-color: var(--blanc);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.gallery-header-content {
+    padding: 20px;
+}
+
+.gallery-main {
+    padding: 60px 20px 100px;
+}
+
+.gallery-status {
+    text-align: center;
+    padding: 80px 20px;
+    font-size: 1.1rem;
+}
+
+.gallery-status-error h1 {
+    color: var(--noir);
+    margin-bottom: 15px;
+}
+
+.gallery-password {
+    max-width: 420px;
+    margin: 60px auto;
+    text-align: center;
+}
+
+.gallery-password h1 {
+    color: var(--noir);
+    margin-bottom: 15px;
+}
+
+.gallery-password p {
+    margin-bottom: 25px;
+}
+
+.gallery-password form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.gallery-password input {
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 2px;
+    font-size: 1rem;
+}
+
+.gallery-intro {
+    text-align: center;
+    margin-bottom: 50px;
+}
+
+.gallery-intro h1 {
+    color: var(--noir);
+    font-size: 2.2rem;
+    margin-bottom: 10px;
+}
+
+.gallery-client {
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+.gallery-intro .btn {
+    margin-top: 20px;
+}
+
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+}
+
+.gallery-item {
+    position: relative;
+    background-color: var(--blanc);
+    border-radius: 5px;
+    overflow: hidden;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+}
+
+.gallery-item img,
+.gallery-item video {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    display: block;
+    background-color: #000;
+}
+
+.gallery-item-download {
+    display: block;
+    text-align: center;
+    padding: 10px;
+    background-color: var(--accent);
+    color: var(--blanc);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: background-color 0.3s;
+}
+
+.gallery-item-download:hover {
+    background-color: #7a6348;
+}
+
 /* RESPONSIVE */
 @media (max-width: 768px) {
     .header-content {
@@ -419,7 +591,15 @@ footer {
     nav li {
         margin: 0 10px;
     }
-    
+
+    .gallery-code-form {
+        right: auto;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 90vw;
+        max-width: 300px;
+    }
+
     .hero-content h1 {
         font-size: 2.5rem;
     }

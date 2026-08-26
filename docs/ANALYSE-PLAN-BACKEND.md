@@ -102,6 +102,126 @@ sections sans image affichent un aplat de couleur de repli), provisionner le VPS
 secrets des trois pipelines CI/CD, puis mettre en place de vraies migrations TypeORM avant d'y
 stocker des données réelles (voir avertissement en section 8).
 
+## Mise à jour du 25 août 2026 (suite) — médiathèque cliente (galeries privées)
+
+Le site vitrine est un site de photographe : le client a demandé un espace où les photos et
+vidéos issues d'une séance puissent être stockées et mises à disposition de ses propres clients,
+qui doivent pouvoir venir télécharger uniquement les fichiers qui leur appartiennent — sans compte
+à créer côté client, et sans jamais accepter un autre type de fichier qu'une photo ou une vidéo.
+
+**Décisions retenues** (validées par le client, choix "Recommandé" à chaque fois) :
+
+- **Accès par lien privé, par galerie** (pas de compte client) : chaque galerie possède un jeton
+  d'accès opaque intégré dans une URL partagée par le photographe (`/?galerie=<token>`), avec
+  protection par mot de passe optionnelle — inspiré du fonctionnement de Pixieset.
+- **Organisation en galeries par séance** : un même client peut recevoir plusieurs galeries dans
+  le temps (une par mariage, séance portrait, événement...), chacune avec son propre lien.
+- **Limite de taille par fichier : 200 Mo** (photos et vidéos), adaptée à un VPS modeste — bien
+  au-delà des 8 Mo déjà en place pour les images du site vitrine, car les livrables clients sont
+  souvent des fichiers pleine résolution.
+- **Téléchargement fichier par fichier, et "tout télécharger" en ZIP** généré à la volée
+  (`archiver`), sans stocker d'archive intermédiaire sur le disque.
+- Comme pour le reste du projet : **aucun stockage externe** (pas de S3/Cloudinary) — les fichiers
+  restent sur le disque du VPS, dans `backend/uploads/galleries/`.
+
+**Ce qui a été livré** dans `backend/src/galleries/` :
+
+- Entités `ClientGallery` (titre, client, description, jeton d'accès, hash de mot de passe
+  optionnel, date d'expiration optionnelle) et `MediaItem` (type photo/vidéo, fichier, taille,
+  ordre) — une contrainte `ON DELETE CASCADE` supprime les médias avec leur galerie.
+- Upload multi-fichiers (`POST /galleries/:id/media`, jusqu'à 100 fichiers par appel) avec une
+  liste blanche stricte de types MIME (JPEG/PNG/WEBP/GIF pour les photos, MP4/MOV/WEBM pour les
+  vidéos) : **tout autre type de fichier est rejeté avec une erreur 400**, conformément à la
+  demande. Le type stocké en base (`photo`/`vidéo`) est dérivé du MIME réel du fichier, jamais
+  choisi librement par l'appelant.
+- Accès public sans authentification : `GET /galleries/access/:token` (déverrouille directement
+  si pas de mot de passe, sinon indique `requiresPassword: true`), `POST
+  /galleries/access/:token/verify` (vérifie le mot de passe par bcrypt, délivre un jeton d'accès
+  JWT de courte durée — 6h — utilisé ensuite pour les téléchargements). Les liens expirés
+  (`expiresAt` dépassée) sont refusés.
+- Téléchargements : fichier unique (`GET
+  .../media/:mediaId/download?access=<jwt>`) et archive ZIP complète générée à la volée (`GET
+  .../download-all?access=<jwt>`), tous deux protégés par le jeton d'accès de la galerie.
+- Routes d'administration (protégées par le même JWT admin que le reste du panneau) : création,
+  modification (y compris changer ou retirer le mot de passe), suppression d'une galerie (avec
+  nettoyage des fichiers sur disque), ajout/suppression de médias. Les réponses admin exposent un
+  booléen `hasPassword` plutôt que le hash bcrypt du mot de passe, cohérent avec le traitement déjà
+  appliqué au mot de passe du compte admin.
+
+**Ce qui a été livré** dans `admin/src/pages/GalleriesPage.tsx` et `GalleryDetailPage.tsx`
+(nouvelle rubrique "Médiathèque" du panneau) :
+
+- Liste des galeries (client, nombre de médias, badge "Protégée"/"Libre"), création/édition avec
+  bascule dédiée pour changer ou retirer un mot de passe, suppression avec confirmation.
+- Page de détail d'une galerie : lien à copier en un clic, zone de dépôt multi-fichiers
+  (glisser-déposer, `@mantine/dropzone`) avec la même liste blanche de types côté client pour un
+  retour immédiat, grille des médias avec vignette (photo) ou pictogramme (vidéo), suppression
+  individuelle d'un média.
+
+**Ce qui a été livré** dans `frontend/src/components/GalleryView.tsx` (nouvelle page cliente) :
+
+- Accessible via `/?galerie=<token>` sur le site vitrine existant, sans routeur supplémentaire
+  (lecture du paramètre d'URL au chargement). Gère les trois états possibles : galerie verrouillée
+  (formulaire de mot de passe), déverrouillée (grille de photos/vidéos avec téléchargement
+  individuel et bouton "Télécharger tout (.zip)"), ou introuvable/expirée (message d'erreur clair).
+
+**Vérification effectuée** : build TypeScript et lint (backend + admin + frontend) sans erreur.
+Vérification bout-en-bout réelle contre un vrai backend démarré pour l'occasion : upload
+photo/vidéo réussi, upload d'un fichier `.txt` rejeté avec 400, accès public direct et par mot de
+passe (bon et mauvais mot de passe), émission et vérification du jeton d'accès temporaire,
+téléchargement d'un fichier unique (contenu vérifié identique à l'original) et téléchargement ZIP
+(archive valide contenant les bons fichiers), suppression d'un média (fichier supprimé du disque),
+suppression d'une galerie protégée après retrait du mot de passe. Contrairement à la vérification
+du panneau admin lors de la Phase 3 initiale, celle-ci a inclus un **rendu et des interactions
+réelles dans un navigateur** (Playwright) pour les trois surfaces (panneau admin, page cliente),
+captures à l'appui : création d'une galerie, dépôt d'un fichier par glisser-déposer avec
+apparition immédiate dans la grille, retrait d'un mot de passe existant, et les trois états de la
+page cliente (verrouillée, déverrouillée, introuvable) avec un téléchargement réellement abouti.
+
+**Ce qu'il reste à faire** : ajouter `VITE_FRONTEND_URL` aux secrets GitHub du pipeline
+`admin-ci-cd.yml` (nécessaire pour que le bouton "Copier le lien" du panneau construise la bonne
+URL en production) ; envisager, si le volume de galeries grandit, un job de nettoyage automatique
+des galeries expirées (actuellement le lien cesse simplement de répondre, les fichiers restent sur
+le disque).
+
+## Mise à jour du 26 août 2026 — parcours client par code court (au lieu d'un lien par galerie)
+
+Précision apportée par le client sur l'usage réel : il ne partage pas un lien différent par
+galerie. Il partage le lien normal de son site à tout le monde lors d'un événement ; les visiteurs
+parcourent alors le site normalement (spécialités, portfolio...). Pour récupérer ses photos, un
+client clique sur un bouton dédié qui fait apparaître un champ, y tape un **code unique** que le
+photographe lui a donné (oralement, par SMS, sur un papier...), et accède alors uniquement à son
+propre catalogue de photos pour le télécharger.
+
+Ce parcours remplace le lien par galerie comme point d'entrée principal (décision validée : garder
+le mot de passe optionnel comme avant, plutôt que de le rendre obligatoire pour compenser un code
+plus court — voir ci-dessous) :
+
+- **Le jeton d'accès devient un code court et prononçable** : 8 caractères sur un alphabet de 32
+  symboles non ambigus à l'oral/à l'écrit (ni 0/O, ni 1/I/L), généré aléatoirement de façon
+  cryptographique (`crypto.randomInt`) et vérifié unique en base avant utilisation. Affiché dans
+  l'admin en deux groupes de 4 (ex. `RN8S-ZWAF`) pour la lisibilité. L'ancien format (jeton
+  hexadécimal de 48 caractères) reste accepté tel quel pour toute galerie déjà créée avant ce
+  changement — aucune migration nécessaire, `access_token` reste une simple colonne texte.
+- **Normalisation du code en défense en profondeur** : le backend met en majuscules et retire tout
+  caractère non alphanumérique du code reçu, que ce soit via le champ du site vitrine ou une URL
+  `?galerie=...` tapée à la main — un client qui tape le code en minuscules, avec des espaces ou
+  le tiret de lisibilité, est donc toujours reconnu.
+- **Nouveau bouton "Récupérer mes photos" dans le menu du site vitrine** (`frontend/src/components/Header.tsx`) : visible sur toutes les pages, fait apparaître un petit formulaire avec le champ de code. La soumission met à jour l'URL (`?galerie=<code>`) sans recharger la page et affiche la même page de galerie que précédemment (`GalleryView.tsx`, inchangée sur le fond) — un lien direct `?galerie=<code>` continue donc aussi de fonctionner, pour un photographe qui préférerait exceptionnellement envoyer un lien.
+- **Panneau admin mis à jour** (`GalleriesPage.tsx`, `GalleryDetailPage.tsx`) : le code est
+  désormais l'élément mis en avant (affiché en grand, bouton "Copier le code" en premier plan), le
+  lien direct est relégué en option secondaire discrète. La liste des galeries affiche une colonne
+  "Code" dédiée (avec troncature + infobulle pour les rares galeries encore sur l'ancien format
+  long). Libellés mis à jour ("Accès libre par code" plutôt que "par lien").
+
+**Vérification effectuée** : build + lint (backend + admin + frontend) sans erreur. Test réel
+contre un vrai backend : génération d'un code de 8 caractères, résolution correcte d'un code tapé
+en minuscules avec tiret via `curl`, et un parcours complet en navigateur (Playwright) — départ
+sur la page d'accueil normale du site (celle que le photographe partage), clic sur "Récupérer mes
+photos", saisie du code en minuscules avec tiret, affichage de la bonne galerie, retour à l'accueil
+via le logo. Les anciennes galeries créées avec le format long continuent de s'afficher et de
+fonctionner normalement dans l'admin (juste tronquées visuellement dans le tableau).
+
 ## 1. Résumé
 
 Le projet `frejus` est actuellement un **site vitrine 100 % statique** (React 18 + Vite + TypeScript) pour un photographe fictif/à personnaliser ("Pixellia Photographie"), déployé sur GitHub Pages via GitHub Actions. Il n'existe **aucun backend, aucune base de données, aucun stockage d'images et aucun formulaire fonctionnel** : tout le contenu (portfolio, spécialités, témoignages, coordonnées) est codé en dur dans les composants React, et le formulaire de contact se contente d'un `alert()` de simulation.
@@ -235,17 +355,4 @@ Compte tenu de la taille actuelle du projet (site vitrine simple, un seul utilis
 
 ## 8. Points d'attention et risques
 
-- **Cold start** des instances gratuites (Render notamment) : la première requête après une période d'inactivité peut prendre plusieurs secondes — acceptable en V1, à surveiller si le trafic augmente.
-- **Coûts** : les offres gratuites suffisent au lancement mais ont des plafonds (stockage, bande passante, requêtes) à surveiller.
-- **Sécurité du formulaire** : validation côté serveur, limitation de débit (rate limiting), protection anti-spam (honeypot ou reCAPTCHA) à prévoir dès la phase 2.
-- **RGPD** : le formulaire de contact collecte des données personnelles (nom, email) — prévoir une mention d'information et une politique de confidentialité réelle (actuellement un lien mort dans le footer).
-- **Contenu réel manquant** : aucune vraie photo, aucun vrai témoignage, coordonnées factices — ce chantier de contenu est indépendant du backend mais bloquant pour une mise en production sérieuse.
-- **Nom de domaine** : aucun domaine personnalisé identifié à ce stade ; à prévoir si le site passe en production réelle.
-
-## 9. Prochaines étapes (mises à jour au 25 août 2026)
-
-1. Tester le panneau admin (`admin/`) une première fois dans un vrai navigateur (`npm run dev`, connexion, édition de chaque section) — le contrat d'API a été vérifié mais pas le rendu/interactions réels de l'interface (contrairement au frontend, désormais vérifié bout-en-bout).
-2. Ajouter de vraies photos via le panneau admin (portfolio, spécialités, accueil, à propos) — le site affiche pour l'instant des aplats de couleur de repli tant qu'aucune image n'est renseignée.
-3. Provisionner un VPS, y déployer `docker-compose.prod.yml` (racine du dépôt, orchestre `api` + `admin`), et renseigner les secrets GitHub requis par `.github/workflows/backend-ci-cd.yml`, `admin-ci-cd.yml` et `deploy.yml` (`VPS_HOST`, `VPS_USERNAME`, `VPS_SSH_KEY`, `VPS_PORT`, `VPS_DEPLOY_PATH`, `ADMIN_VITE_API_URL` pour l'admin, `FRONTEND_VITE_API_URL` pour le frontend) pour activer le déploiement automatique des trois projets.
-4. Avant d'y stocker des données réelles : mettre en place de vraies migrations TypeORM et passer `DB_SYNCHRONIZE=false` (actuellement à `true` pour la rapidité du MVP — voir avertissement en section 8 et dans `backend/README.md`).
-5. Valider avec le client réel le contenu définitif (textes, photos, coordonnées) et clarifier la localisation du studio (Fréjus vs Paris) — ce contenu peut désormais être saisi directement dans le panneau admin et apparaît immédiatement sur le site vitrine.
+- **Cold start** des instances gratuites (Render notamment) : la première requête après une

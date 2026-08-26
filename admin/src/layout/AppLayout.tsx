@@ -14,6 +14,7 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import {
   IconCamera,
+  IconLibraryPhoto,
   IconLogout,
   IconMessage,
   IconMessageCircle,
@@ -32,6 +33,7 @@ const NAV_ITEMS = [
   { to: '/settings', label: 'Réglages du site', icon: IconSettings },
   { to: '/specialties', label: 'Spécialités', icon: IconStar },
   { to: '/portfolio', label: 'Portfolio', icon: IconPhoto },
+  { to: '/galleries', label: 'Médiathèque', icon: IconLibraryPhoto },
   { to: '/testimonials', label: 'Témoignages', icon: IconMessage },
   { to: '/contact-messages', label: 'Messages de contact', icon: IconMessageCircle },
 ];

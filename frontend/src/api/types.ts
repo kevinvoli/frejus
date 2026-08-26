@@ -47,3 +47,38 @@ export interface Testimonial {
   published: boolean;
   createdAt: string;
 }
+
+// Médiathèque cliente (voir backend/src/galleries) : accès public par lien, sans
+// compte. Formes miroir de GalleriesService.getPublicAccess/verifyPassword.
+export const MediaType = {
+  PHOTO: 'photo',
+  VIDEO: 'video',
+} as const;
+export type MediaType = (typeof MediaType)[keyof typeof MediaType];
+
+export interface GalleryMedia {
+  id: number;
+  type: MediaType;
+  fileUrl: string;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
+export interface GalleryLocked {
+  id: number;
+  title: string;
+  requiresPassword: true;
+}
+
+export interface GalleryUnlocked {
+  id: number;
+  title: string;
+  clientName: string;
+  description: string | null;
+  requiresPassword: false;
+  accessJwt: string;
+  media: GalleryMedia[];
+}
+
+export type GalleryAccessResponse = GalleryLocked | GalleryUnlocked;

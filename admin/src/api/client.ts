@@ -111,6 +111,43 @@ export async function uploadImage(file: File): Promise<string> {
   return result.url;
 }
 
+// Médiathèque : upload multi-fichiers (photos/vidéos) vers une galerie cliente. Le
+// filtrage des types autorisés est fait côté backend (voir galleries.controller.ts) ;
+// on restreint déjà côté Dropzone pour un retour immédiat, mais le serveur reste la
+// seule source de vérité.
+export async function uploadGalleryMedia<T>(galleryId: number, files: File[]): Promise<T> {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append('files', file);
+  }
+  return apiFetch<T>(`/galleries/${galleryId}/media`, {
+    method: 'POST',
+    body: formData,
+    isFormData: true,
+  });
+}
+
+// URL publique du site vitrine (pour construire le lien de galerie partageable au
+// client, cf. .env.example). Distincte de VITE_API_URL : le site vitrine et l'API ne
+// sont pas forcément sur le même sous-domaine.
+const FRONTEND_URL = (import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173').replace(
+  /\/$/,
+  '',
+);
+
+export function galleryShareUrl(accessToken: string): string {
+  return `${FRONTEND_URL}/?galerie=${accessToken}`;
+}
+
+// Découpe le code d'accès (8 caractères, cf. backend/src/galleries/galleries.service.ts)
+// en deux groupes de 4 pour la lisibilité — c'est ce code que le photographe
+// communique oralement ou par écrit à son client, qui le saisit ensuite dans le champ
+// "Récupérer mes photos" du site vitrine (pas de lien à cliquer nécessaire).
+export function formatGalleryCode(accessToken: string): string {
+  if (accessToken.length !== 8) return accessToken;
+  return `${accessToken.slice(0, 4)}-${accessToken.slice(4)}`;
+}
+
 // Construit l'URL absolue d'une image à partir du chemin relatif renvoyé par l'API
 // (ex: "/uploads/xxx.jpg"). Retourne undefined si aucune image n'est définie.
 export function assetUrl(path: string | null | undefined): string | undefined {

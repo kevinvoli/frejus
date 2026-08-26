@@ -7,12 +7,28 @@ const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3000/api').re
 // images, servies par le backend hors du préfixe /api (voir backend/src/main.ts).
 const API_ORIGIN = API_URL.replace(/\/api$/, '');
 
+function extractErrorMessage(payload: unknown, fallback: string): string {
+  if (payload && typeof payload === 'object' && 'message' in payload) {
+    const message = (payload as { message: unknown }).message;
+    if (Array.isArray(message)) return message.join(', ');
+    if (typeof message === 'string') return message;
+  }
+  return fallback;
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`);
   if (!res.ok) {
-    throw new Error(`Erreur ${res.status} sur ${path}`);
+    const payload = await res.json().catch(() => null);
+    throw new Error(extractErrorMessage(payload, `Erreur ${res.status} sur ${path}`));
   }
   return (await res.json()) as T;
+}
+
+// Construit l'URL absolue d'un endpoint de l'API (ex: pour un lien de téléchargement
+// direct <a href=...>, qui ne passe pas par fetch()).
+export function apiUrl(path: string): string {
+  return `${API_URL}${path}`;
 }
 
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {

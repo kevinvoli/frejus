@@ -11,6 +11,7 @@ import { PortfolioModule } from './portfolio/portfolio.module';
 import { TestimonialsModule } from './testimonials/testimonials.module';
 import { ContactModule } from './contact/contact.module';
 import { UploadModule } from './upload/upload.module';
+import { GalleriesModule } from './galleries/galleries.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { UploadModule } from './upload/upload.module';
     TestimonialsModule,
     ContactModule,
     UploadModule,
+    GalleriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

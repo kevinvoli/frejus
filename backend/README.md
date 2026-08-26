@@ -64,6 +64,15 @@ Tous préfixés par `/api`. Les routes marquées 🔒 nécessitent un header
 | POST | `/contact` | Envoi du formulaire de contact (public) |
 | GET/PATCH/DELETE 🔒 | `/contact[/:id]` | Boîte de réception des messages (admin) |
 | POST 🔒 | `/upload` | Upload d'image (`multipart/form-data`, champ `file`), retourne `{ url }` |
+| GET 🔒 | `/galleries` | Liste des galeries clientes (médiathèque) |
+| GET 🔒 | `/galleries/:id` | Détail d'une galerie (avec médias) |
+| POST/PUT/DELETE 🔒 | `/galleries[/:id]` | CRUD galeries |
+| POST 🔒 | `/galleries/:id/media` | Upload multi-fichiers (photos/vidéos, 200 Mo max) |
+| DELETE 🔒 | `/galleries/:id/media/:mediaId` | Suppression d'un média |
+| GET | `/galleries/access/:token` | Accès public à une galerie (public) |
+| POST | `/galleries/access/:token/verify` | Vérification du mot de passe (public) |
+| GET | `/galleries/access/:token/media/:mediaId/download?access=<jwt>` | Téléchargement d'un fichier (public) |
+| GET | `/galleries/access/:token/download-all?access=<jwt>` | Téléchargement de la galerie en ZIP (public) |
 | GET | `/health` | Healthcheck |
 
 ## Déploiement
@@ -78,6 +87,4 @@ requis pour le job de déploiement sont documentés en tête de ce fichier de wo
 
 `DB_SYNCHRONIZE=true` (par défaut) fait créer/adapter les tables automatiquement
 par TypeORM depuis les entités : pratique pour ce MVP, mais risqué dès que la base
-contient des données réelles importantes. Avant une mise en production sérieuse,
-mettre en place de vraies migrations TypeORM (`typeorm migration:generate` /
-`migration:run`) et passer `DB_SYNCHRONIZE=false`.
+contient des données réelles importantes. Avant une mise e
