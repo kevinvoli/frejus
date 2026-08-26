@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Provisionne une base + un utilisateur dédiés à un projet sur l'instance MySQL
-# mutualisée. A lancer depuis /opt/infrastructure/mysql :
+# mutualisee. A lancer depuis le dossier de ce compose :
 #
 #   ./create-app-db.sh frejus frejus '<mot-de-passe>'
 #

@@ -3,7 +3,7 @@
 # configuration HTTPS définitive. A lancer UNE FOIS, en root, après vps-bootstrap.sh
 # et une fois les DNS propagés :
 #
-#   sudo bash /opt/infrastructure/nginx/tls-setup.sh
+#   sudo bash ./tls-setup.sh
 #
 # Déroulé : conf HTTP temporaire -> certbot certonly --webroot -> conf HTTPS finale.
 # certbot n'édite jamais la configuration (mode certonly), qui reste pilotée par le
@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-NGINX_DIR="${NGINX_DIR:-/opt/infrastructure/nginx}"
+NGINX_DIR="${NGINX_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 # Dossier applicatif : doit correspondre au secret GitHub VPS_APP_PATH.
 APP_DIR="${APP_DIR:-/opt/apps/frejus}"
 APP_ENV="${APP_ENV:-${APP_DIR}/.env}"

@@ -3,8 +3,13 @@
 # la teste, puis recharge Nginx. A relancer après toute modification du template ou
 # des domaines.
 #
-#   sudo /opt/infrastructure/nginx/nginx-apply.sh                       # template du .env
-#   sudo /opt/infrastructure/nginx/nginx-apply.sh <chemin/template>     # template imposé
+# OUTIL MANUEL, exigeant les droits root : le pipeline CI/CD ne l'appelle jamais.
+# Nginx est administré à la main sur l'hôte, ce qui permet à l'utilisateur de
+# déploiement de n'avoir aucun sudo. Voir le README.md de ce dossier pour la
+# procédure entièrement manuelle, si tu préfères ne pas passer par ce script.
+#
+#   sudo ./nginx-apply.sh                       # template designe par le .env
+#   sudo ./nginx-apply.sh <chemin/template>     # template impose
 #
 # Le template appliqué est choisi, par ordre de priorité :
 #   1. l'argument $1
@@ -18,9 +23,8 @@
 
 set -euo pipefail
 
-NGINX_DIR="${NGINX_DIR:-/opt/infrastructure/nginx}"
-# Dossier applicatif : doit correspondre au secret GitHub VPS_APP_PATH. Le pipeline
-# CI/CD le transmet ; en usage manuel le défaut suffit.
+NGINX_DIR="${NGINX_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+# Dossier applicatif : doit correspondre à la variable GitHub VPS_APP_PATH.
 APP_DIR="${APP_DIR:-/opt/apps/frejus}"
 APP_ENV="${APP_ENV:-${APP_DIR}/.env}"
 TARGET=/etc/nginx/sites-available/frejus.conf

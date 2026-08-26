@@ -41,46 +41,65 @@ public (80/443) ; les trois conteneurs ne sont publiés que sur `127.0.0.1`.
 
 Un pipeline unique, [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml), qui
 ne construit et ne redéploie que les composants dont les fichiers ont changé :
-
 | Chemin modifié | Image publiée | Service | Port interne | Domaine |
 |---|---|---|---|---|
 | `frontend/**` | `frejus-frontend` | `web` (nginx) | `127.0.0.1:3000` | `SITE_DOMAIN` |
 | `backend/**` | `frejus-backend` | `api` (NestJS) | `127.0.0.1:4000` | `API_DOMAIN` |
 | `admin/**` | `frejus-admin` | `admin` (nginx) | `127.0.0.1:3001` | `ADMIN_DOMAIN` |
-| `deploy/**` | — | infrastructure | — | — |
+| `deploy/apps/**` | — | fichiers de la stack | — | — |
 
 Les images sont publiées sur le GitHub Container Registry, puis `deploy.sh` est appelé
-en SSH sur le VPS pour ne redémarrer que les services concernés. Un changement dans
-`deploy/**` synchronise `/opt` et recharge Nginx. Le menu *Run workflow* permet de
-forcer un composant précis, ou tout reconstruire.
+en SSH sur le VPS pour ne redémarrer que les services concernés. Le menu *Run workflow*
+permet de forcer un composant précis, ou tout reconstruire.
 
-Deux modes d'exposition, choisis par `NGINX_TEMPLATE` dans le `.env` du VPS :
+Le déploiement ne sort jamais de `VPS_APP_PATH`. **Le reverse proxy et la base de
+données sont administrés à la main**, hors du dépôt : le pipeline ne les installe pas,
+ne les configure pas et ne les redémarre pas. Ce qu'ils doivent fournir est décrit dans
+[`deploy/reference/`](deploy/reference/).
+
+Deux modes d'exposition, selon le vhost Nginx choisi :
 
 - **domaine + HTTPS** (`frejus.conf.template`) — un vhost par domaine, certificats
   Certbot (`certonly --webroot`) renouvelés automatiquement ;
 - **IP nue** (`frejus-ip.conf.template`) — sans domaine ni HTTPS, pour valider la
   stack : site sur `http://IP/`, API sur `http://IP/api/`, admin sur `http://IP:8080/`.
 
-MySQL est mutualisé entre les projets du VPS (`/opt/infrastructure/mysql`), avec une
-base et un utilisateur dédiés par projet.
+L'API joint la base via `DB_NETWORK` (réseau Docker à rejoindre) et `DB_HOST` /
+`DB_PORT` du `.env` : base conteneurisée, sur l'hôte ou distante, peu importe.
 
-### `deploy/` — infrastructure versionnée
-
-Ce dossier reproduit l'arborescence `/opt` du VPS et y est synchronisé par le pipeline
-CI/CD lorsque `deploy/**` change :
+### `deploy/` — ce qui part sur le VPS, et ce qui n'en part pas
 
 ```
 deploy/
-├── apps/frejus/            -> /opt/apps/frejus/
+├── apps/frejus/            -> synchronisé vers VPS_APP_PATH
 │   ├── docker-compose.yml
 │   ├── .env.example
 │   └── deploy.sh
-├── infrastructure/         -> /opt/infrastructure/
-│   ├── nginx/              configuration Nginx (templates) + scripts TLS
-│   └── mysql/              instance MySQL mutualisée
-└── scripts/
-    └── vps-bootstrap.sh    préparation d'un VPS Debian/Ubuntu vierge
+├── reference/              NON déployé — administré à la main, avec les droits root
+│   ├── nginx/              vhosts de référence pour le reverse proxy
+│   └── mysql/              point de départ si la base n'existe pas déjà
+└── scripts/                lancés à la main, une seule fois
+    ├── vps-bootstrap.sh    VPS vierge : Docker, Nginx, utilisateur, dossier, pare-feu
+    ├── vps-prepare.sh      VPS déjà administré : crée le dossier applicatif
+    └── vps-check.sh        diagnostic des prérequis, ne modifie rien
 ```
 
-Les fichiers `.env` de production ne sont jamais versionnés ni poussés par les
-pipelines : ils sont créés à la main sur le VPS depuis les `.env.example`.
+Sur le VPS, `VPS_APP_PATH` finit par ressembler à ceci :
+
+```
+/opt/apps/frejus/
+├── docker-compose.yml      copiés par le pipeline
+├── deploy.sh
+├── .env                    créé à la main, jamais versionné ni poussé
+├── data/uploads/           images uploadées
+└── logs/                   logs Nginx du projet, si tu les y diriges
+```
+
+Le déploiement n'utilise **aucun `sudo`**. L'utilisateur SSH n'a besoin que
+d'appartenir au groupe `docker` et de posséder `VPS_APP_PATH` : le pipeline y crée
+lui-même `data/uploads`, `logs` et le réseau Docker `frejus` au premier déploiement.
+Créer ce dossier et lui en donner la propriété est la seule opération qui demande root
+— une fois, avec [`deploy/scripts/vps-prepare.sh`](deploy/scripts/vps-prepare.sh).
+
+MySQL, Nginx, le pare-feu et SSH restent administrés à la main, hors du périmètre du
+pipeline — voir [`deploy/reference/`](deploy/reference/).

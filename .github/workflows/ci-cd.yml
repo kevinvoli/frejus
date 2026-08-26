@@ -6,12 +6,16 @@ name: CI/CD
 #   backend/**   -> image frejus-backend   -> service "api"
 #   frontend/**  -> image frejus-frontend  -> service "web"
 #   admin/**     -> image frejus-admin     -> service "admin"
-#   deploy/**    -> synchronisation de /opt sur le VPS + rechargement de Nginx
+#   deploy/**    -> synchronisation de deploy/apps/frejus vers VPS_APP_PATH
 #
 #   changes -> build (un job de matrice par composant modifié) -> deploy
 #
 # Modifier ce fichier reconstruit les trois images : on ne peut pas savoir lequel des
 # composants est affecté par un changement de pipeline.
+#
+# Le pipeline n'utilise JAMAIS sudo : Nginx est installé et configuré à la main sur
+# l'hôte, hors du périmètre du déploiement. L'utilisateur SSH n'a donc besoin que
+# d'appartenir au groupe docker et de pouvoir écrire dans VPS_APP_PATH.
 #
 # Secrets requis (Settings > Secrets and variables > Actions) :
 #   VPS_HOST      adresse IP ou nom d'hôte du VPS
@@ -19,8 +23,8 @@ name: CI/CD
 #   VPS_SSH_KEY   clé privée SSH correspondante (sans passphrase)
 #
 # Secrets ou variables facultatifs :
-#   VPS_PORT      port SSH                        (défaut : 22)
-#   VPS_APP_PATH  dossier applicatif sur le VPS   (défaut : /opt/apps/frejus)
+#   VPS_PORT       port SSH                            (défaut : 22)
+#   VPS_APP_PATH   dossier applicatif sur le VPS       (défaut : /opt/apps/frejus)
 #   GHCR_USERNAME / GHCR_TOKEN   seulement si les packages GHCR restent privés
 #
 # URL gravées en dur dans les bundles par Vite : les changer impose de relancer ce
@@ -267,8 +271,40 @@ jobs:
           else
             echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
+      # Le pipeline n'a aucun sudo : il ne peut créer ces dossiers que si VPS_APP_PATH
+      # lui appartient déjà. Il ne sort jamais de ce dossier — MySQL et Nginx sont
+      # administrés à la main, ailleurs sur la machine.
+      - name: Préparer l'arborescence et le réseau Docker
+        if: steps.check.outputs.configured == 'true'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || vars.VPS_PORT || 22 }}
+          envs: APP_PATH
+          script: |
+            set -e
+            if [ ! -d "$APP_PATH" ] || [ ! -w "$APP_PATH" ]; then
+              echo "ERREUR : ${APP_PATH} inexistant ou non accessible en écriture pour $(id -un)." >&2
+              echo "Le créer et en donner la propriété à cet utilisateur, ou pointer" >&2
+              echo "VPS_APP_PATH vers un dossier qu'il possède déjà." >&2
+              exit 1
+            fi
 
-      - name: Copier deploy/apps/frejus vers /opt/apps/frejus
+            mkdir -p "$APP_PATH/data/uploads" "$APP_PATH/logs"
+
+            # Réseau privé des trois services du projet. L'appartenance au groupe
+            # docker suffit : le démon tourne en root, aucun sudo ici.
+            # Le réseau de la base (DB_NETWORK) n'est pas créé : il appartient à
+            # l'administrateur de MySQL.
+            docker network inspect frejus >/dev/null 2>&1 || docker network create frejus
+
+            echo "Arborescence prête sous ${APP_PATH}."
+        env:
+          APP_PATH: ${{ secrets.VPS_APP_PATH || vars.VPS_APP_PATH || '/opt/apps/frejus' }}
+
+      - name: Copier deploy/apps/frejus sur le VPS
         if: steps.check.outputs.configured == 'true' && needs.changes.outputs.infra == 'true'
         uses: appleboy/scp-action@v1
         with:
@@ -280,19 +316,8 @@ jobs:
           target: ${{ secrets.VPS_APP_PATH || vars.VPS_APP_PATH || '/opt/apps/frejus' }}
           strip_components: 3
 
-      - name: Copier deploy/infrastructure vers /opt/infrastructure
-        if: steps.check.outputs.configured == 'true' && needs.changes.outputs.infra == 'true'
-        uses: appleboy/scp-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
-          username: ${{ secrets.VPS_USER || vars.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || vars.VPS_PORT || 22 }}
-          source: 'deploy/infrastructure/*,deploy/infrastructure/mysql/.env.example'
-          target: /opt/infrastructure
-          strip_components: 2
 
-      - name: Appliquer la configuration et redéployer les services
+      - name: Redéployer les services
         if: steps.check.outputs.configured == 'true'
         uses: appleboy/ssh-action@v1
         with:
@@ -303,28 +328,9 @@ jobs:
           envs: APP_PATH,TARGETS,INFRA,GHCR_USERNAME,GHCR_TOKEN
           script: |
             set -e
-            if [ ! -d "$APP_PATH" ]; then
-              echo "ERREUR : ${APP_PATH} absent sur le VPS." >&2
-              echo "Lancer d'abord vps-bootstrap.sh puis copier deploy/ (voir docs/DEPLOIEMENT-VPS.md)." >&2
-              exit 1
-            fi
-
-            if [ "$INFRA" = "true" ]; then
-              chmod +x "$APP_PATH"/deploy.sh \
-                       /opt/infrastructure/nginx/*.sh \
-                       /opt/infrastructure/mysql/*.sh 2>/dev/null || true
-
-              # nginx-apply.sh choisit son template depuis NGINX_TEMPLATE du .env et
-              # restaure la configuration précédente si `nginx -t` échoue (cas typique :
-              # template HTTPS appliqué avant que Certbot ait produit les certificats).
-              # Un échec n'interrompt donc pas le pipeline et ne met pas le VPS hors ligne.
-              if [ -f "$APP_PATH/.env" ]; then
-                APP_DIR="$APP_PATH" sudo -n /opt/infrastructure/nginx/nginx-apply.sh \
-                  || echo "::warning::Nginx non rechargé — lancer nginx-apply.sh à la main."
-              else
-                echo "Configuration Nginx ignorée : ${APP_PATH}/.env absent."
-              fi
-            fi
+            # Le déploiement ne sort jamais de APP_PATH. Ni MySQL ni Nginx ne sont
+            # touchés : ils sont administrés à la main, hors du dépôt. Après un
+            # changement des ports publiés ou d'un domaine, recharger Nginx à la main.
 
             # Au tout premier passage le .env n'existe pas encore : la synchronisation
             # des fichiers a quand même réussi, ce n'est donc pas un échec de pipeline.

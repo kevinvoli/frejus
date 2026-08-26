@@ -1,9 +1,12 @@
-# Instance MySQL mutualisée entre tous les projets du VPS.
-# Vit dans /opt/infrastructure/mysql. Une base + un utilisateur dédiés par projet,
+# Instance MySQL de référence, mutualisable entre les projets du VPS.
+#
+# NON DÉPLOYÉ : point de départ si la base n'a pas déjà été provisionnée à la main.
+# À copier sur le VPS et lancer soi-même. Une base + un utilisateur dédiés par projet,
 # provisionnés avec ./create-app-db.sh (ce compose ne crée aucune base applicative).
 #
 # Le port 3306 n'est publié que sur 127.0.0.1, pour les sauvegardes et un client
-# local ; les applications passent par le réseau Docker "infrastructure".
+# local ; les applications passent par le réseau Docker externe ci-dessous, dont le
+# nom doit être repris dans DB_NETWORK du .env applicatif.
 
 name: infrastructure-mysql
 

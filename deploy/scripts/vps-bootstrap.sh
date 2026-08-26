@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
-# Prépare un VPS Debian/Ubuntu vierge pour accueillir la stack frejus.
+# Prépare un VPS Debian/Ubuntu VIERGE pour accueillir la stack frejus.
 # A exécuter UNE SEULE FOIS, en root, sur le VPS :
 #
 #   sudo bash vps-bootstrap.sh
 #
-# Installe Docker, Nginx et Certbot, crée l'utilisateur de déploiement, les réseaux
-# Docker partagés et l'arborescence /opt. Ne démarre aucune application : voir
-# docs/DEPLOIEMENT-VPS.md pour la suite.
+# Installe Docker, Nginx et Certbot, crée l'utilisateur de déploiement, le dossier
+# applicatif et le réseau Docker du projet. Ne démarre aucune application, et
+# n'installe pas MySQL : la base est administrée à part (voir deploy/reference/).
+#
+# NE PAS LANCER sur un VPS déjà administré à la main : ce script réinstalle des
+# paquets, réécrit les règles ufw et supprime le vhost Nginx par défaut. Dans ce cas,
+# utiliser vps-prepare.sh, qui se limite à créer le dossier applicatif.
+#
+# Aucune règle sudo n'est posée : le pipeline n'en a pas besoin. Nginx et le pare-feu
+# se configurent à la main, avec les droits root, hors du périmètre du déploiement.
 
 set -euo pipefail
 
@@ -50,43 +57,21 @@ install -d -m 0700 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "/home/${DEPLOY_USER}/.ss
 touch "/home/${DEPLOY_USER}/.ssh/authorized_keys"
 chown "$DEPLOY_USER:$DEPLOY_USER" "/home/${DEPLOY_USER}/.ssh/authorized_keys"
 chmod 600 "/home/${DEPLOY_USER}/.ssh/authorized_keys"
-
-# nginx-apply.sh écrit dans /etc/nginx et recharge le service : l'utilisateur deploy
-# doit pouvoir le lancer sans mot de passe pour que le pipeline CI/CD applique la
-# conf après un scp. Ce n'est pas un affaiblissement : deploy est membre du groupe
-# docker, ce qui équivaut déjà à un accès root sur cette machine.
-cat > /etc/sudoers.d/${DEPLOY_USER}-nginx <<SUDO
-${DEPLOY_USER} ALL=(root) NOPASSWD: /opt/infrastructure/nginx/nginx-apply.sh
-${DEPLOY_USER} ALL=(root) NOPASSWD: /opt/infrastructure/nginx/nginx-apply.sh *
-${DEPLOY_USER} ALL=(root) NOPASSWD: /opt/infrastructure/nginx/tls-setup.sh
-Defaults!/opt/infrastructure/nginx/nginx-apply.sh env_keep += "APP_DIR APP_ENV NGINX_DIR"
-Defaults!/opt/infrastructure/nginx/tls-setup.sh   env_keep += "APP_DIR APP_ENV NGINX_DIR"
-SUDO
-chmod 440 /etc/sudoers.d/${DEPLOY_USER}-nginx
-visudo -cf /etc/sudoers.d/${DEPLOY_USER}-nginx
-
 echo "==> Arborescence /opt"
-install -d -m 0755 -o "$DEPLOY_USER" -g "$DEPLOY_USER" /opt/apps
+install -d -m 0755 -o root           -g root           /opt/apps
 install -d -m 0750 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "${APP_DIR}"
 install -d -m 0755 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "${APP_DIR}/data"
-install -d -m 0755 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "${APP_DIR}/data/api"
-install -d -m 0755 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "${APP_DIR}/data/api/uploads"
-# Vides par convention : le site vitrine et l'admin sont des builds statiques sans état.
-install -d -m 0755 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "${APP_DIR}/data/frontend"
-install -d -m 0755 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "${APP_DIR}/data/admin"
-# Nginx (www-data) écrit ses logs ici, l'utilisateur deploy doit pouvoir les lire.
+install -d -m 0755 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "${APP_DIR}/data/uploads"
+# Nginx (www-data) y écrit ses logs, l'utilisateur de déploiement doit pouvoir les lire.
 install -d -m 0775 -o "$DEPLOY_USER" -g adm "${APP_DIR}/logs"
-
-install -d -m 0755 -o "$DEPLOY_USER" -g "$DEPLOY_USER" /opt/infrastructure
-install -d -m 0750 -o "$DEPLOY_USER" -g "$DEPLOY_USER" /opt/infrastructure/nginx
-install -d -m 0750 -o "$DEPLOY_USER" -g "$DEPLOY_USER" /opt/infrastructure/mysql
 install -d -m 0750 -o "$DEPLOY_USER" -g "$DEPLOY_USER" /opt/backups
 # Racine du challenge ACME, servie en clair par Nginx pour le renouvellement des certificats.
 install -d -m 0755 /var/www/certbot
 
-echo "==> Réseaux Docker partagés"
+echo "==> Réseau Docker du projet"
+# Le réseau de la base n'est pas créé ici : MySQL est administré à part, et son
+# réseau est désigné par DB_NETWORK dans le .env applicatif.
 docker network inspect frejus >/dev/null 2>&1 || docker network create frejus
-docker network inspect infrastructure >/dev/null 2>&1 || docker network create infrastructure
 
 echo "==> Rotation des logs Nginx du projet"
 # Le corps du bloc est en heredoc quoté pour que $(cat /run/nginx.pid) soit écrit
@@ -126,18 +111,19 @@ cat <<MSG
 VPS prêt.
 
 Arborescence créée :
-  ${APP_DIR}/{data/{api/uploads,frontend,admin},logs}
-  /opt/infrastructure/{nginx,mysql}
+  ${APP_DIR}/
+  ├── data/uploads/
+  └── logs/
   /opt/backups
 
-Réseaux Docker : frejus, infrastructure
+Réseau Docker : frejus
 
 Suite (voir docs/DEPLOIEMENT-VPS.md) :
  1. Ajouter la clé publique de déploiement dans
     /home/${DEPLOY_USER}/.ssh/authorized_keys
- 2. Copier les fichiers du dépôt (deploy/) dans /opt, remplir les deux .env
- 3. Démarrer MySQL puis créer la base du projet
- 4. Lancer tls-setup.sh pour obtenir les certificats et activer la conf Nginx
- 5. Déployer la stack applicative
+ 2. Provisionner MySQL : base + utilisateur dédiés, joignables depuis un conteneur
+ 3. Remplir ${APP_DIR}/.env (le pipeline y dépose .env.example au 1er passage)
+ 4. Configurer le reverse proxy -> deploy/reference/nginx/
+ 5. Ouvrir les ports web au pare-feu, puis lancer le pipeline
 ======================================================================
 MSG

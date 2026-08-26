@@ -1,20 +1,19 @@
 # Stack applicative frejus — déployée dans /opt/apps/frejus sur le VPS.
 #
 # Aucun port n'est exposé sur Internet : les trois services sont publiés sur
-# 127.0.0.1 uniquement, et Nginx (installé sur l'hôte, configs dans
-# /opt/infrastructure/nginx) est le seul point d'entrée public en 80/443.
+# 127.0.0.1 uniquement, et Nginx — installé et configuré à la main sur l'hôte — est
+# le seul point d'entrée public en 80/443.
 #
-#   Internet ──▶ Nginx :443 ──┬─▶ 127.0.0.1:3000  web    (site vitrine)
-#                             ├─▶ 127.0.0.1:4000  api    (NestJS)
-#                             └─▶ 127.0.0.1:3001  admin  (panneau)
+#   Internet ──▶ Nginx ──┬─▶ 127.0.0.1:3000  web    (site vitrine)
+#                        ├─▶ 127.0.0.1:4000  api    (NestJS)
+#                        └─▶ 127.0.0.1:3001  admin  (panneau)
 #
-# MySQL n'est PAS dans ce fichier : il est mutualisé entre les projets du VPS
-# (/opt/infrastructure/mysql). L'API le joint par le réseau Docker partagé
-# "infrastructure", sous le nom d'hôte "mysql".
+# MySQL n'est PAS dans ce fichier et n'est jamais touché par le déploiement : la base
+# est administrée à la main, hors de ce dépôt. L'API la joint via DB_HOST / DB_PORT du
+# .env, et via le réseau Docker nommé par DB_NETWORK — voir .env.example.
 #
-# Les deux réseaux sont externes et créés une fois par scripts/vps-bootstrap.sh :
+# Le réseau "frejus" est externe et créé par le pipeline au premier déploiement :
 #   docker network create frejus
-#   docker network create infrastructure
 
 name: frejus
 
@@ -40,9 +39,6 @@ services:
     env_file:
       - .env
     environment:
-      # MySQL mutualisé, joint par le réseau "infrastructure".
-      DB_HOST: mysql
-      DB_PORT: 3306
       # Le conteneur écoute sur 3000 (défaut de l'app, identique au dev local) ;
       # c'est la publication ci-dessous qui expose l'API sur le 4000 de l'hôte.
       PORT: 3000
@@ -51,10 +47,10 @@ services:
     volumes:
       # Images uploadées (portfolio, spécialités, galeries) — bind mount pour que
       # les sauvegardes se fassent simplement depuis l'hôte.
-      - ./data/api/uploads:/app/uploads
+      - ./data/uploads:/app/uploads
     networks:
       - frejus
-      - infrastructure
+      - database
     logging:
       driver: json-file
       options:
@@ -78,7 +74,13 @@ services:
         max-file: '3'
 
 networks:
+  # Réseau privé des trois services du projet.
   frejus:
     external: true
-  infrastructure:
+
+  # Réseau par lequel l'API joint la base de données. Externe et nommé depuis le .env :
+  # il appartient à l'administrateur de MySQL, pas à ce fichier. Voir .env.example pour
+  # le couple DB_NETWORK / DB_HOST selon la façon dont la base est hébergée.
+  database:
     external: true
+    name: ${DB_NETWORK:-bridge}
