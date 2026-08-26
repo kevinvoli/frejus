@@ -7,3 +7,6 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 vite-dev*.log
+
+# .env de production du VPS : créés à la main depuis les .env.example
+deploy/**/.env

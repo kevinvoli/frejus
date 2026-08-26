@@ -1,22 +1,23 @@
 name: Admin CI/CD
 
-# Pipeline dédié au panneau admin (dossier admin/), indépendant des workflows du
-# site vitrine (GitHub Pages) et du backend (backend-ci-cd.yml).
+# Pipeline du panneau admin (dossier admin/).
+#   test -> build-and-push (GHCR) -> deploy (SSH vers le VPS, service "admin")
 #
-# Secrets GitHub à configurer avant que le job "deploy" fonctionne
-# (Settings > Secrets and variables > Actions) :
-#   VPS_HOST          adresse IP ou nom d'hôte du VPS (partagé avec le backend)
-#   VPS_USERNAME      utilisateur SSH de déploiement
-#   VPS_SSH_KEY       clé privée SSH correspondante (sans passphrase)
-#   VPS_PORT          port SSH (22 par défaut si absent)
-#   VPS_DEPLOY_PATH   dossier sur le VPS contenant docker-compose.prod.yml et le .env
-#   ADMIN_VITE_API_URL  URL publique de l'API utilisée par le panneau admin, ex :
-#                        https://api.pixellia.example.com/api
-#                        Gravée en dur dans le build (Vite), donc nécessaire ici en
-#                        secret de build et non seulement dans le .env du VPS.
+# Secrets de build supplémentaires (gravés en dur dans le bundle par Vite : les
+# changer impose de relancer ce pipeline, éditer le .env du VPS ne suffit pas) :
+#   ADMIN_VITE_API_URL       URL publique de l'API,          ex : https://api.exemple.fr/api
+#   ADMIN_VITE_FRONTEND_URL  URL publique du site vitrine,   ex : https://exemple.fr
+#                            (sert à construire le lien de galerie partagé au client)
 #
-# Tant que ces secrets ne sont pas renseignés, seuls les jobs "test" et
-# "build-and-push" s'exécutent utilement ; le job "deploy" échouera faute de cible.
+# Secrets requis (Settings > Secrets and variables > Actions) :
+#   VPS_HOST      adresse IP ou nom d'hôte du VPS
+#   VPS_USER      utilisateur SSH de déploiement
+#   VPS_SSH_KEY   clé privée SSH correspondante (sans passphrase)
+#
+# Secrets facultatifs :
+#   VPS_PORT      port SSH                        (défaut : 22)
+#   VPS_APP_PATH  dossier applicatif sur le VPS   (défaut : /opt/apps/frejus)
+#   GHCR_USERNAME / GHCR_TOKEN   seulement si les packages GHCR restent privés
 
 on:
   push:
@@ -55,11 +56,11 @@ jobs:
         run: npm run lint
 
       - name: Build
-        # VITE_API_URL n'a pas besoin d'être correcte ici : ce build ne sert qu'à
-        # vérifier la compilation, l'image publiée est reconstruite avec la vraie
-        # valeur dans le job build-and-push ci-dessous.
+        # Valeurs sans importance ici : ce job ne vérifie que la compilation, l'image
+        # publiée est reconstruite avec les vraies URL dans le job build-and-push.
         env:
           VITE_API_URL: http://localhost:3000/api
+          VITE_FRONTEND_URL: http://localhost:5173
         run: npm run build
 
   build-and-push:
@@ -86,8 +87,11 @@ jobs:
         with:
           context: admin
           push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           build-args: |
-            VITE_API_URL=${{ secrets.ADMIN_VITE_API_URL }}
+            VITE_API_URL=${{ secrets.ADMIN_VITE_API_URL || vars.ADMIN_VITE_API_URL || 'http://localhost:3000/api' }}
+            VITE_FRONTEND_URL=${{ secrets.ADMIN_VITE_FRONTEND_URL || vars.ADMIN_VITE_FRONTEND_URL || 'http://localhost:5173' }}
           tags: |
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
@@ -97,16 +101,43 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
+      # Le contexte `secrets` n'est pas accessible dans un `if:` de job : la
+      # vérification se fait donc ici et conditionne le step suivant, pour que le
+      # pipeline reste vert tant que le VPS n'est pas prêt.
+      - name: Vérifier la configuration du VPS
+        id: check
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+        run: |
+          if [ -z "$VPS_HOST" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Secret VPS_HOST absent : déploiement ignoré. L'image reste publiée sur GHCR."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Déployer via SSH
+        if: steps.check.outputs.configured == 'true'
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
+          host: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER || vars.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
+          port: ${{ secrets.VPS_PORT || vars.VPS_PORT || 22 }}
+          envs: APP_PATH,IMAGE_NAME,GIT_SHA,GHCR_USERNAME,GHCR_TOKEN
           script: |
-            cd ${{ secrets.VPS_DEPLOY_PATH }}
-            export ADMIN_IMAGE=${{ env.IMAGE_NAME }}:${{ github.sha }}
-            docker compose -f docker-compose.prod.yml pull admin
-            docker compose -f docker-compose.prod.yml up -d admin
-            docker image prune -f
+            set -e
+            if [ ! -d "$APP_PATH" ]; then
+              echo "ERREUR : ${APP_PATH} absent sur le VPS." >&2
+              echo "Lancer d'abord vps-bootstrap.sh puis copier deploy/ (voir docs/DEPLOIEMENT-VPS.md)." >&2
+              exit 1
+            fi
+            cd "$APP_PATH"
+            chmod +x deploy.sh
+            ./deploy.sh admin "${IMAGE_NAME}:${GIT_SHA}"
+        env:
+          APP_PATH: ${{ secrets.VPS_APP_PATH || vars.VPS_APP_PATH || '/opt/apps/frejus' }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          GIT_SHA: ${{ github.sha }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME || vars.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}

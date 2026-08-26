@@ -1,7 +1,15 @@
-name: Backend CI/CD
+name: Frontend CI/CD
 
-# Pipeline du backend NestJS (dossier backend/).
-#   test -> build-and-push (GHCR) -> deploy (SSH vers le VPS, service "api")
+# Pipeline du site vitrine (dossier frontend/).
+#   test -> build-and-push (GHCR) -> deploy (SSH vers le VPS, service "web")
+#
+# Secret de build supplémentaire :
+#   FRONTEND_VITE_API_URL  URL publique de l'API, ex : https://api.exemple.fr/api
+#                          Gravée en dur dans le bundle par Vite : la changer impose
+#                          de relancer ce pipeline, éditer le .env du VPS ne suffit pas.
+#                          Tant qu'elle est absente, le site est construit contre
+#                          http://localhost:3000/api et n'affichera que son contenu
+#                          de repli une fois en ligne.
 #
 # Secrets requis (Settings > Secrets and variables > Actions) :
 #   VPS_HOST      adresse IP ou nom d'hôte du VPS
@@ -18,20 +26,20 @@ on:
     branches:
       - master
     paths:
-      - 'backend/**'
-      - '.github/workflows/backend-ci-cd.yml'
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci-cd.yml'
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/frejus-backend
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/frejus-frontend
 
 jobs:
   test:
-    name: Build & tests
+    name: Build & typecheck
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend
+        working-directory: frontend
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -41,19 +49,17 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
       - name: Build
+        # Valeur sans importance ici : ce job ne vérifie que la compilation, l'image
+        # publiée est reconstruite avec la vraie URL dans le job build-and-push.
+        env:
+          VITE_API_URL: http://localhost:3000/api
         run: npm run build
-
-      - name: Unit tests
-        run: npm test -- --ci
 
   build-and-push:
     name: Build & push image Docker
@@ -77,10 +83,12 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: backend
+          context: frontend
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            VITE_API_URL=${{ secrets.FRONTEND_VITE_API_URL || vars.FRONTEND_VITE_API_URL || 'http://localhost:3000/api' }}
           tags: |
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
@@ -123,7 +131,7 @@ jobs:
             fi
             cd "$APP_PATH"
             chmod +x deploy.sh
-            ./deploy.sh api "${IMAGE_NAME}:${GIT_SHA}"
+            ./deploy.sh web "${IMAGE_NAME}:${GIT_SHA}"
         env:
           APP_PATH: ${{ secrets.VPS_APP_PATH || vars.VPS_APP_PATH || '/opt/apps/frejus' }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}

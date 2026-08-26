@@ -1,18 +1,13 @@
 # --- Étape 1 : build ---
 # VITE_API_URL est "gravée en dur" dans les fichiers JS statiques au moment du build
 # (Vite ne lit pas les variables d'environnement au runtime). Elle doit donc être
-# passée en build-arg par le pipeline CI/CD (voir .github/workflows/admin-ci-cd.yml),
+# passée en build-arg par le pipeline CI/CD (voir .github/workflows/frontend-ci-cd.yml),
 # et non dans le .env du VPS : changer l'URL de l'API nécessite de reconstruire l'image.
 FROM node:22-alpine AS build
 WORKDIR /app
 
 ARG VITE_API_URL
 ENV VITE_API_URL=${VITE_API_URL}
-
-# URL publique du site vitrine, utilisée pour construire le lien de galerie partagé
-# au client. Même contrainte de build-time que VITE_API_URL ci-dessus.
-ARG VITE_FRONTEND_URL
-ENV VITE_FRONTEND_URL=${VITE_FRONTEND_URL}
 
 COPY package.json package-lock.json ./
 RUN npm ci

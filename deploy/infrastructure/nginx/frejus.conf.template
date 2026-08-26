@@ -1,0 +1,132 @@
+# Nginx (hôte) — point d'entrée public unique du VPS pour le projet frejus.
+#
+# Ce fichier est un TEMPLATE : les ${...} sont remplacés par nginx-apply.sh à partir
+# du .env de /opt/apps/frejus, et le résultat est écrit dans
+# /etc/nginx/sites-available/frejus.conf. Ne pas éditer le fichier généré : il est
+# écrasé à chaque application. ${HTTP2} est calculé par nginx-apply.sh selon la
+# version de Nginx installée, ${APP_DIR} est le dossier applicatif sur le VPS.
+#
+# Les certificats sont obtenus par certbot en mode `certonly --webroot` : certbot ne
+# modifie donc jamais cette configuration (sinon la prochaine application l'écraserait).
+
+# --- Redirection HTTP -> HTTPS, et challenge ACME ---
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${SITE_DOMAIN} ${API_DOMAIN} ${ADMIN_DOMAIN};
+
+    # Renouvellement des certificats : doit rester servi en clair.
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# --- Site vitrine ---
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    ${HTTP2}
+    server_name ${SITE_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${SITE_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${SITE_DOMAIN}/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    access_log ${APP_DIR}/logs/site-access.log;
+    error_log  ${APP_DIR}/logs/site-error.log;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        include /etc/nginx/snippets/frejus-proxy.conf;
+    }
+}
+
+# --- API NestJS (routes /api/* et images uploadées /uploads/*) ---
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    ${HTTP2}
+    server_name ${API_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${API_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${API_DOMAIN}/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    access_log ${APP_DIR}/logs/api-access.log;
+    error_log  ${APP_DIR}/logs/api-error.log;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+
+    # Upload d'images (portfolio, galeries) : la limite Nginx par défaut est de 1 Mo.
+    client_max_body_size 25M;
+
+    gzip on;
+    gzip_types application/json;
+    gzip_min_length 1024;
+
+    # Images uploadées : noms de fichiers uniques côté backend, donc cachables
+    # longtemps par le navigateur.
+    # Un bloc add_header dans un location remplace ceux du server : les en-têtes de
+    # sécurité doivent être répétés ici, sinon ils disparaissent sur /uploads/.
+    location /uploads/ {
+        proxy_pass http://127.0.0.1:4000;
+        include /etc/nginx/snippets/frejus-proxy.conf;
+
+        expires 30d;
+        add_header Cache-Control "public" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options "nosniff" always;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:4000;
+        include /etc/nginx/snippets/frejus-proxy.conf;
+    }
+}
+
+# --- Panneau d'administration ---
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    ${HTTP2}
+    server_name ${ADMIN_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${ADMIN_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${ADMIN_DOMAIN}/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    access_log ${APP_DIR}/logs/admin-access.log;
+    error_log  ${APP_DIR}/logs/admin-error.log;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    # Ce panneau n'a rien à faire dans les moteurs de recherche.
+    add_header X-Robots-Tag "noindex, nofollow" always;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        include /etc/nginx/snippets/frejus-proxy.conf;
+    }
+}

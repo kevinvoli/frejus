@@ -1,0 +1,18 @@
+# Configuration TEMPORAIRE, en HTTP seul, utilisée uniquement pour obtenir les
+# premiers certificats Let's Encrypt : la configuration définitive (frejus.conf)
+# référence des certificats qui n'existent pas encore et empêcherait Nginx de
+# démarrer. Posée puis remplacée automatiquement par tls-setup.sh (même dossier).
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${SITE_DOMAIN} ${API_DOMAIN} ${ADMIN_DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 503;
+    }
+}
