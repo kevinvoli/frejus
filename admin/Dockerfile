@@ -3,7 +3,7 @@
 # (Vite ne lit pas les variables d'environnement au runtime). Elle doit donc être
 # passée en build-arg par le pipeline CI/CD (voir .github/workflows/admin-ci-cd.yml),
 # et non dans le .env du VPS : changer l'URL de l'API nécessite de reconstruire l'image.
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 
 ARG VITE_API_URL
