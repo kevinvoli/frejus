@@ -17,7 +17,8 @@ import {
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconEdit, IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconEdit, IconPhoto, IconPlus, IconTrash } from '@tabler/icons-react';
+import { useNavigate } from 'react-router-dom';
 import { apiFetch, ApiError, nullifyEmptyStrings } from '../api/client';
 import type { Specialty } from '../api/types';
 import { ImageUploadField } from '../components/ImageUploadField';
@@ -32,6 +33,7 @@ interface SpecialtyFormValues {
 const EMPTY_VALUES: SpecialtyFormValues = { title: '', description: '', imageUrl: '', order: 0 };
 
 export function SpecialtiesPage() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<Specialty[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Specialty | null>(null);
@@ -120,7 +122,13 @@ export function SpecialtiesPage() {
   return (
     <Stack>
       <Group justify="space-between">
-        <Title order={2}>Spécialités</Title>
+        <div>
+          <Title order={2}>Spécialités</Title>
+          <Text c="dimmed" size="sm">
+            Cliquez sur une spécialité pour gérer son catalogue de photos (galerie affichée
+            au clic sur le site vitrine).
+          </Text>
+        </div>
         <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
           Ajouter
         </Button>
@@ -137,12 +145,17 @@ export function SpecialtiesPage() {
               <Table.Th>Ordre</Table.Th>
               <Table.Th>Titre</Table.Th>
               <Table.Th>Description</Table.Th>
+              <Table.Th>Catalogue</Table.Th>
               <Table.Th />
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {items.map((item) => (
-              <Table.Tr key={item.id}>
+              <Table.Tr
+                key={item.id}
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/specialties/${item.id}`)}
+              >
                 <Table.Td>{item.order}</Table.Td>
                 <Table.Td>{item.title}</Table.Td>
                 <Table.Td>
@@ -151,6 +164,14 @@ export function SpecialtiesPage() {
                   </Text>
                 </Table.Td>
                 <Table.Td>
+                  <Group gap={4}>
+                    <IconPhoto size={14} color="var(--mantine-color-dimmed)" />
+                    <Text size="sm" c="dimmed">
+                      {item.photos.length}
+                    </Text>
+                  </Group>
+                </Table.Td>
+                <Table.Td onClick={(e) => e.stopPropagation()}>
                   <Group gap="xs" justify="flex-end">
                     <ActionIcon variant="light" onClick={() => openEdit(item)} aria-label="Modifier">
                       <IconEdit size={16} />
@@ -169,7 +190,7 @@ export function SpecialtiesPage() {
             ))}
             {items.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={4}>
+                <Table.Td colSpan={5}>
                   <Text c="dimmed" ta="center">
                     Aucune spécialité pour l'instant.
                   </Text>

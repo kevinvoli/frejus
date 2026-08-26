@@ -1,0 +1,84 @@
+# Stack applicative frejus — déployée dans /opt/apps/frejus sur le VPS.
+#
+# Aucun port n'est exposé sur Internet : les trois services sont publiés sur
+# 127.0.0.1 uniquement, et Nginx (installé sur l'hôte, configs dans
+# /opt/infrastructure/nginx) est le seul point d'entrée public en 80/443.
+#
+#   Internet ──▶ Nginx :443 ──┬─▶ 127.0.0.1:3000  web    (site vitrine)
+#                             ├─▶ 127.0.0.1:4000  api    (NestJS)
+#                             └─▶ 127.0.0.1:3001  admin  (panneau)
+#
+# MySQL n'est PAS dans ce fichier : il est mutualisé entre les projets du VPS
+# (/opt/infrastructure/mysql). L'API le joint par le réseau Docker partagé
+# "infrastructure", sous le nom d'hôte "mysql".
+#
+# Les deux réseaux sont externes et créés une fois par scripts/vps-bootstrap.sh :
+#   docker network create frejus
+#   docker network create infrastructure
+
+name: frejus
+
+services:
+  web:
+    image: ${FRONTEND_IMAGE:-ghcr.io/kevinvoli/frejus-frontend:latest}
+    container_name: frejus-web
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:3000:80'
+    networks:
+      - frejus
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  api:
+    image: ${BACKEND_IMAGE:-ghcr.io/kevinvoli/frejus-backend:latest}
+    container_name: frejus-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # MySQL mutualisé, joint par le réseau "infrastructure".
+      DB_HOST: mysql
+      DB_PORT: 3306
+      # Le conteneur écoute sur 3000 (défaut de l'app, identique au dev local) ;
+      # c'est la publication ci-dessous qui expose l'API sur le 4000 de l'hôte.
+      PORT: 3000
+    ports:
+      - '127.0.0.1:4000:3000'
+    volumes:
+      # Images uploadées (portfolio, spécialités, galeries) — bind mount pour que
+      # les sauvegardes se fassent simplement depuis l'hôte.
+      - ./data/api/uploads:/app/uploads
+    networks:
+      - frejus
+      - infrastructure
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  admin:
+    image: ${ADMIN_IMAGE:-ghcr.io/kevinvoli/frejus-admin:latest}
+    container_name: frejus-admin
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '127.0.0.1:3001:80'
+    networks:
+      - frejus
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+networks:
+  frejus:
+    external: true
+  infrastructure:
+    external: true

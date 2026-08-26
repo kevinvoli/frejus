@@ -187,6 +187,12 @@ export function GalleryDetailPage() {
             <Text size="xs" c="dimmed">
               Il le saisit dans "Récupérer mes photos" sur le site vitrine — aucun lien à cliquer.
             </Text>
+            <Text size="xs" c="dimmed">
+              Utilisé {gallery.useCount} fois
+              {gallery.maxUses
+                ? ` sur ${gallery.maxUses} autorisée(s) (modifiable depuis la liste des galeries)`
+                : ' — aucune limite fixée'}
+            </Text>
           </Stack>
           <CopyButton value={gallery.accessToken}>
             {({ copied, copy }) => (

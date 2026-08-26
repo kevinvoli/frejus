@@ -1,0 +1,8 @@
+# Les scripts et confs déployés sur le VPS doivent rester en LF, même clonés
+# depuis Windows : un CRLF casse le shebang et les directives Nginx.
+*.sh text eol=lf
+*.conf text eol=lf
+*.template text eol=lf
+*.example text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf

@@ -7,6 +7,7 @@ import {
   Group,
   Loader,
   Modal,
+  NumberInput,
   Stack,
   Switch,
   Table,
@@ -38,6 +39,7 @@ interface GalleryFormValues {
   description: string;
   password: string;
   expiresAt: string;
+  maxUses: number | '';
   clearPassword: boolean;
 }
 
@@ -48,6 +50,7 @@ const EMPTY_VALUES: GalleryFormValues = {
   description: '',
   password: '',
   expiresAt: '',
+  maxUses: '',
   clearPassword: false,
 };
 
@@ -103,6 +106,7 @@ export function GalleriesPage() {
       description: gallery.description ?? '',
       password: '',
       expiresAt: gallery.expiresAt ? gallery.expiresAt.slice(0, 10) : '',
+      maxUses: gallery.maxUses ?? '',
       clearPassword: false,
     });
     open();
@@ -117,6 +121,7 @@ export function GalleriesPage() {
         clientEmail: values.clientEmail || null,
         description: values.description || null,
         expiresAt: values.expiresAt || null,
+        maxUses: values.maxUses === '' ? null : values.maxUses,
       };
       if (values.clearPassword) {
         payload.password = null;
@@ -208,6 +213,7 @@ export function GalleriesPage() {
               <Table.Th>Client</Table.Th>
               <Table.Th>Code</Table.Th>
               <Table.Th>Médias</Table.Th>
+              <Table.Th>Utilisations</Table.Th>
               <Table.Th>Accès</Table.Th>
               <Table.Th />
             </Table.Tr>
@@ -241,6 +247,20 @@ export function GalleriesPage() {
                   </Tooltip>
                 </Table.Td>
                 <Table.Td>{gallery.mediaCount}</Table.Td>
+                <Table.Td>
+                  <Tooltip
+                    label={
+                      gallery.maxUses
+                        ? `Limite fixée par l'admin : ${gallery.maxUses} utilisation(s)`
+                        : 'Aucune limite fixée'
+                    }
+                  >
+                    <Text>
+                      {gallery.useCount}
+                      {gallery.maxUses ? ` / ${gallery.maxUses}` : ''}
+                    </Text>
+                  </Tooltip>
+                </Table.Td>
                 <Table.Td>
                   <Tooltip label={gallery.hasPassword ? 'Protégée par mot de passe' : 'Accès libre par code'}>
                     <Badge
@@ -279,7 +299,7 @@ export function GalleriesPage() {
             ))}
             {galleries.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={6}>
+                <Table.Td colSpan={7}>
                   <Text c="dimmed" ta="center">
                     Aucune galerie pour l'instant.
                   </Text>
@@ -319,12 +339,28 @@ export function GalleriesPage() {
               minRows={2}
               {...form.getInputProps('description')}
             />
-            <TextInput
-              type="date"
-              label="Expiration du lien"
-              description="Laisser vide pour un lien sans expiration"
-              {...form.getInputProps('expiresAt')}
-            />
+            <Group grow>
+              <TextInput
+                type="date"
+                label="Expiration du code"
+                description="Laisser vide pour un code sans expiration"
+                {...form.getInputProps('expiresAt')}
+              />
+              <NumberInput
+                label="Nombre d'utilisations max"
+                description={
+                  editing
+                    ? `Laisser vide pour illimité — déjà utilisé ${editing.useCount} fois`
+                    : 'Laisser vide pour illimité'
+                }
+                placeholder="illimité"
+                min={1}
+                step={1}
+                allowDecimal={false}
+                allowNegative={false}
+                {...form.getInputProps('maxUses')}
+              />
+            </Group>
 
             {editing?.hasPassword && !form.values.clearPassword ? (
               <Group justify="space-between" align="flex-end">

@@ -1,0 +1,97 @@
+# Nginx (hôte) — point d'entrée public du VPS pour frejus, MODE IP NUE.
+#
+# Variante sans domaine ni HTTPS, destinée à valider la stack avant l'achat/la
+# configuration d'un nom de domaine. Sélectionnée depuis le .env applicatif :
+#
+#   NGINX_TEMPLATE=frejus-ip.conf.template
+#
+# Une fois le domaine en place, repasser à frejus.conf.template et lancer
+# tls-setup.sh : aucun changement de code applicatif n'est nécessaire.
+#
+#   http://IP/            -> 127.0.0.1:3000  web    (site vitrine)
+#   http://IP/api/        -> 127.0.0.1:4000  api    (NestJS, préfixe global /api)
+#   http://IP/uploads/    -> 127.0.0.1:4000  api    (images uploadées)
+#   http://IP:${ADMIN_PORT}/  -> 127.0.0.1:3001  admin  (panneau)
+#
+# L'admin est publié sur son propre port et non sous /admin/ : c'est une SPA
+# react-router-dom servie à la racine (pas de `base` Vite ni de `basename`), un
+# sous-chemin casserait le routage et les assets. Le port doit être ouvert au
+# pare-feu : `ufw allow ${ADMIN_PORT}/tcp`.
+#
+# Aucun en-tête HSTS ici : en clair, il n'aurait aucun sens.
+
+# --- Site vitrine + API (port 80) ---
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    access_log ${APP_DIR}/logs/site-access.log;
+    error_log  ${APP_DIR}/logs/site-error.log;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Upload d'images (portfolio, galeries) : la limite Nginx par défaut est de 1 Mo.
+    client_max_body_size 25M;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    # API NestJS. Le préfixe /api fait partie des routes de l'application
+    # (setGlobalPrefix), il ne doit donc PAS être retiré du proxy_pass.
+    location /api/ {
+        proxy_pass http://127.0.0.1:4000;
+        include /etc/nginx/snippets/frejus-proxy.conf;
+
+        access_log ${APP_DIR}/logs/api-access.log;
+        error_log  ${APP_DIR}/logs/api-error.log;
+    }
+
+    # Images uploadées : noms de fichiers uniques côté backend, donc cachables
+    # longtemps par le navigateur.
+    # Un bloc add_header dans un location remplace ceux du server : les en-têtes de
+    # sécurité doivent être répétés ici, sinon ils disparaissent sur /uploads/.
+    location /uploads/ {
+        proxy_pass http://127.0.0.1:4000;
+        include /etc/nginx/snippets/frejus-proxy.conf;
+
+        expires 30d;
+        add_header Cache-Control "public" always;
+        add_header X-Content-Type-Options "nosniff" always;
+
+        access_log ${APP_DIR}/logs/api-access.log;
+        error_log  ${APP_DIR}/logs/api-error.log;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        include /etc/nginx/snippets/frejus-proxy.conf;
+    }
+}
+
+# --- Panneau d'administration (port dédié) ---
+server {
+    listen ${ADMIN_PORT} default_server;
+    listen [::]:${ADMIN_PORT} default_server;
+    server_name _;
+
+    access_log ${APP_DIR}/logs/admin-access.log;
+    error_log  ${APP_DIR}/logs/admin-error.log;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    # Ce panneau n'a rien à faire dans les moteurs de recherche.
+    add_header X-Robots-Tag "noindex, nofollow" always;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        include /etc/nginx/snippets/frejus-proxy.conf;
+    }
+}

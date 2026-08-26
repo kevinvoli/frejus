@@ -9,6 +9,11 @@ WORKDIR /app
 ARG VITE_API_URL
 ENV VITE_API_URL=${VITE_API_URL}
 
+# URL publique du site vitrine, utilisée pour construire le lien de galerie partagé
+# au client. Même contrainte de build-time que VITE_API_URL ci-dessus.
+ARG VITE_FRONTEND_URL
+ENV VITE_FRONTEND_URL=${VITE_FRONTEND_URL}
+
 COPY package.json package-lock.json ./
 RUN npm ci
 

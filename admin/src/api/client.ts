@@ -127,6 +127,23 @@ export async function uploadGalleryMedia<T>(galleryId: number, files: File[]): P
   });
 }
 
+// Catalogue de photos d'une spécialité (voir specialties.controller.ts) : upload
+// multi-fichiers, images uniquement.
+export async function uploadSpecialtyPhotos<T>(
+  specialtyId: number,
+  files: File[],
+): Promise<T> {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append('files', file);
+  }
+  return apiFetch<T>(`/specialties/${specialtyId}/photos`, {
+    method: 'POST',
+    body: formData,
+    isFormData: true,
+  });
+}
+
 // URL publique du site vitrine (pour construire le lien de galerie partageable au
 // client, cf. .env.example). Distincte de VITE_API_URL : le site vitrine et l'API ne
 // sont pas forcément sur le même sous-domaine.

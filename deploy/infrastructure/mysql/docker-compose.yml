@@ -1,0 +1,42 @@
+# Instance MySQL mutualisée entre tous les projets du VPS.
+# Vit dans /opt/infrastructure/mysql. Une base + un utilisateur dédiés par projet,
+# provisionnés avec ./create-app-db.sh (ce compose ne crée aucune base applicative).
+#
+# Le port 3306 n'est publié que sur 127.0.0.1, pour les sauvegardes et un client
+# local ; les applications passent par le réseau Docker "infrastructure".
+
+name: infrastructure-mysql
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: mysql
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - '127.0.0.1:3306:3306'
+    volumes:
+      - ./data:/var/lib/mysql
+    networks:
+      - infrastructure
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-p${MYSQL_ROOT_PASSWORD}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+networks:
+  infrastructure:
+    external: true
