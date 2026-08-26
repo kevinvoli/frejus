@@ -85,13 +85,15 @@ jobs:
                      /opt/infrastructure/nginx/*.sh \
                      /opt/infrastructure/mysql/*.sh 2>/dev/null || true
 
-            # Nginx n'est reconfiguré que s'il a déjà été initialisé : sans
-            # certificats, `nginx -t` échouerait sur la conf HTTPS.
-            if [ -d /etc/letsencrypt/live ]; then
+            # nginx-apply.sh choisit son template depuis NGINX_TEMPLATE du .env et
+            # restaure la configuration précédente si `nginx -t` échoue (cas typique :
+            # template HTTPS appliqué avant que Certbot ait produit les certificats).
+            # Un échec n'interrompt donc pas le pipeline et ne met pas le VPS hors ligne.
+            if [ -f "$APP_PATH/.env" ]; then
               APP_DIR="$APP_PATH" sudo -n /opt/infrastructure/nginx/nginx-apply.sh \
                 || echo "::warning::Nginx non rechargé — lancer nginx-apply.sh à la main."
             else
-              echo "Certificats absents : lancer tls-setup.sh avant la première mise en ligne."
+              echo "Configuration Nginx ignorée : ${APP_PATH}/.env absent."
             fi
 
             # Au tout premier passage le .env n'existe pas encore et aucune image

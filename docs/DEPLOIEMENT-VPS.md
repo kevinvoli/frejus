@@ -63,6 +63,35 @@ que 22, 80 et 443.
 Tout ce qui est versionné vit dans `deploy/` du dépôt et se synchronise sur `/opt`
 via le pipeline **Infra CI/CD**. Seuls les deux `.env` et `data/` sont propres au VPS.
 
+
+---
+
+## Deux modes de mise en ligne
+
+La stack peut être exposée de deux façons. Le mode est choisi par la variable
+`NGINX_TEMPLATE` du `.env` applicatif ; passer de l'un à l'autre ne demande aucune
+modification du code applicatif.
+
+| | **Domaine + HTTPS** | **IP nue** |
+|---|---|---|
+| `NGINX_TEMPLATE` | `frejus.conf.template` | `frejus-ip.conf.template` |
+| Site vitrine | `https://SITE_DOMAIN` | `http://IP/` |
+| API | `https://API_DOMAIN/api` | `http://IP/api/` |
+| Admin | `https://ADMIN_DOMAIN` | `http://IP:8080/` |
+| Prérequis | 3 enregistrements DNS + Certbot | aucun |
+| Ports ouverts | 22, 80, 443 | 22, 80, 443, `ADMIN_PORT` |
+
+Le mode IP nue sert à valider la stack de bout en bout avant d'avoir un domaine. Le
+panneau admin y est publié sur son propre port plutôt que sous `/admin/` : c'est une
+SPA `react-router-dom` servie à la racine (pas de `base` Vite ni de `basename`), un
+sous-chemin casserait le routage et les assets.
+
+> **Le trafic est en clair.** Le JWT de l'admin et le mot de passe de connexion
+> transitent sans chiffrement : à réserver à une validation technique, pas à une
+> ouverture au public ni à des données réelles.
+
+Les étapes 1 (DNS) et 7 (HTTPS) ne concernent que le mode domaine — voir
+[la variante IP nue](#7bis-variante-ip-nue-sans-domaine-ni-https) à la place.
 ---
 
 ## 1. DNS
@@ -174,6 +203,54 @@ Certbot n'édite jamais la configuration : celle-ci est régénérée depuis
 template **dans le dépôt** — le fichier `/etc/nginx/sites-available/frejus.conf` est
 écrasé à chaque application.
 
+## 7bis. Variante IP nue (sans domaine ni HTTPS)
+
+À la place des étapes 1 et 7. Remplacer `<IP>` par l'IP publique du VPS.
+
+Dans `/opt/apps/frejus/.env` :
+
+```bash
+SITE_DOMAIN=<IP>
+API_DOMAIN=<IP>
+ADMIN_DOMAIN=<IP>
+NGINX_TEMPLATE=frejus-ip.conf.template
+ADMIN_PORT=8080
+CORS_ORIGIN=http://<IP>,http://<IP>:8080
+```
+
+Les trois variables `*_DOMAIN` reçoivent la même valeur : en mode IP nue elles ne
+servent qu'à l'affichage, le template n'utilise que `server_name _`.
+
+Ouvrir le port de l'admin et appliquer la configuration :
+
+```bash
+sudo ufw allow 8080/tcp
+sudo /opt/infrastructure/nginx/nginx-apply.sh
+```
+
+`nginx-apply.sh` retire alors le lien `/etc/nginx/sites-enabled/default` (le fichier
+reste dans `sites-available`), qui revendiquerait le même `default_server` sur le port
+80. Si la configuration produite est invalide, l'état précédent est restauré et Nginx
+n'est pas rechargé.
+
+Côté GitHub, les trois variables de build valent :
+
+| Variable | Valeur |
+|---|---|
+| `FRONTEND_VITE_API_URL` | `http://<IP>/api` |
+| `ADMIN_VITE_API_URL` | `http://<IP>/api` |
+| `ADMIN_VITE_FRONTEND_URL` | `http://<IP>` |
+
+### Repasser en domaine + HTTPS
+
+1. Créer les trois enregistrements DNS A (étape 1).
+2. Dans le `.env` : remettre les vrais domaines, `NGINX_TEMPLATE=frejus.conf.template`,
+   `CORS_ORIGIN=https://<SITE_DOMAIN>,https://<ADMIN_DOMAIN>`.
+3. `sudo /opt/infrastructure/nginx/tls-setup.sh`
+4. `sudo ufw delete allow 8080/tcp`
+5. Mettre à jour les trois variables `VITE_*` en `https://…` et **relancer les
+   pipelines Frontend et Admin** : ces URL sont gravées dans les bundles au build.
+
 ## 8. Secrets et variables GitHub
 
 GitHub distingue deux onglets dans `Settings > Secrets and variables > Actions` :
@@ -238,12 +315,20 @@ docker compose ps
 docker compose logs -f api
 ```
 
-3. Vérifier depuis l'extérieur :
+3. Vérifier depuis l'extérieur.
+
+   En mode domaine :
    - `https://pixellia.fr` -> site vitrine
    - `https://api.pixellia.fr/api/settings` -> JSON
-   - `https://admin.pixellia.fr` -> login (identifiants = `ADMIN_EMAIL` /
-     `ADMIN_PASSWORD` du `.env`). **Changer le mot de passe immédiatement après le
-     premier login.**
+   - `https://admin.pixellia.fr` -> login
+
+   En mode IP nue :
+   - `http://<IP>/` -> site vitrine
+   - `http://<IP>/api/settings` -> JSON
+   - `http://<IP>:8080/` -> login
+
+   Identifiants = `ADMIN_EMAIL` / `ADMIN_PASSWORD` du `.env`. **Changer le mot de
+   passe immédiatement après le premier login.**
 
 ## 10. Déploiements suivants
 

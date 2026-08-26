@@ -27,10 +27,10 @@ sa propre configuration et son propre pipeline de déploiement :
   (procédure de déploiement complète, pas à pas) et `docs/ANALYSE-PLAN-BACKEND.md`
   (analyse de l'existant, choix d'architecture, feuille de route).
 
-Les trois projets cohabitent sur le même VPS, orchestrés par `docker-compose.prod.yml`
-(à la racine) et exposés en HTTPS par un reverse proxy Caddy (voir `Caddyfile`), mais
-restent trois images Docker et trois pipelines CI/CD indépendants : modifier l'un ne
-redéploie jamais les autres.
+Les trois projets cohabitent sur le même VPS, derrière un Nginx installé sur l'hôte
+et orchestrés par `deploy/apps/frejus/docker-compose.yml`, mais restent trois images
+Docker et trois pipelines CI/CD indépendants : modifier l'un ne redéploie jamais les
+autres.
 
 ## Déploiement
 
@@ -47,9 +47,14 @@ public (80/443) ; les trois conteneurs ne sont publiés que sur `127.0.0.1`.
 | `deploy/**` | infrastructure | — | — | `infra-ci-cd.yml` |
 
 Chaque pipeline construit son image, la publie sur le GitHub Container Registry, puis
-appelle `deploy.sh` en SSH sur le VPS pour ne redémarrer que son service. Les
-certificats HTTPS sont gérés par Certbot (`certonly --webroot`), renouvelés
-automatiquement.
+appelle `deploy.sh` en SSH sur le VPS pour ne redémarrer que son service.
+
+Deux modes d'exposition, choisis par `NGINX_TEMPLATE` dans le `.env` du VPS :
+
+- **domaine + HTTPS** (`frejus.conf.template`) — un vhost par domaine, certificats
+  Certbot (`certonly --webroot`) renouvelés automatiquement ;
+- **IP nue** (`frejus-ip.conf.template`) — sans domaine ni HTTPS, pour valider la
+  stack : site sur `http://IP/`, API sur `http://IP/api/`, admin sur `http://IP:8080/`.
 
 MySQL est mutualisé entre les projets du VPS (`/opt/infrastructure/mysql`), avec une
 base et un utilisateur dédiés par projet.
