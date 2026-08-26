@@ -21,6 +21,7 @@ import {
   IconPhoto,
   IconSettings,
   IconStar,
+  IconTags,
 } from '@tabler/icons-react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
@@ -33,6 +34,7 @@ const NAV_ITEMS = [
   { to: '/settings', label: 'Réglages du site', icon: IconSettings },
   { to: '/specialties', label: 'Spécialités', icon: IconStar },
   { to: '/portfolio', label: 'Portfolio', icon: IconPhoto },
+  { to: '/portfolio-categories', label: 'Catégories du portfolio', icon: IconTags },
   { to: '/galleries', label: 'Médiathèque', icon: IconLibraryPhoto },
   { to: '/testimonials', label: 'Témoignages', icon: IconMessage },
   { to: '/contact-messages', label: 'Messages de contact', icon: IconMessageCircle },
@@ -88,7 +90,11 @@ export function AppLayout() {
 
           <Stack gap={2}>
             {NAV_ITEMS.map((item) => {
-              const active = location.pathname.startsWith(item.to);
+              // Comparaison avec bornage sur "/" : évite qu'un préfixe partagé entre
+              // deux routes (ex. /portfolio et /portfolio-categories) ne mette en
+              // surbrillance les deux items à la fois.
+              const active =
+                location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
               return (
                 <MantineNavLink
                   key={item.to}

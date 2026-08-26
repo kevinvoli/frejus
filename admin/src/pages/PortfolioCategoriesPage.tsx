@@ -10,45 +10,44 @@ import {
   Stack,
   Table,
   Text,
-  Textarea,
   TextInput,
   Title,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconEdit, IconPhoto, IconPlus, IconTrash } from '@tabler/icons-react';
-import { useNavigate } from 'react-router-dom';
-import { apiFetch, ApiError, nullifyEmptyStrings } from '../api/client';
-import type { Specialty } from '../api/types';
-import { ImageUploadField } from '../components/ImageUploadField';
+import { IconEdit, IconPlus, IconTrash } from '@tabler/icons-react';
+import { apiFetch, ApiError } from '../api/client';
+import type { PortfolioCategory } from '../api/types';
 
-interface SpecialtyFormValues {
-  title: string;
-  description: string;
-  imageUrl: string;
+interface CategoryFormValues {
+  name: string;
   order: number;
 }
 
-const EMPTY_VALUES: SpecialtyFormValues = { title: '', description: '', imageUrl: '', order: 0 };
+const EMPTY_VALUES: CategoryFormValues = { name: '', order: 0 };
 
-export function SpecialtiesPage() {
-  const navigate = useNavigate();
-  const [items, setItems] = useState<Specialty[]>([]);
+// Liste des catégories proposées à la création/modification d'un élément de
+// portfolio (voir PortfolioPage.tsx) — gérée ici pour ne plus être une saisie
+// libre. Supprimer une catégorie n'affecte pas les éléments qui l'utilisent déjà,
+// ils conservent simplement leur texte de catégorie tel quel (voir
+// docs/ANALYSE-PLAN-BACKEND.md).
+export function PortfolioCategoriesPage() {
+  const [items, setItems] = useState<PortfolioCategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<Specialty | null>(null);
+  const [editing, setEditing] = useState<PortfolioCategory | null>(null);
   const [opened, { open, close }] = useDisclosure(false);
   const [saving, setSaving] = useState(false);
 
-  const form = useForm<SpecialtyFormValues>({
+  const form = useForm<CategoryFormValues>({
     initialValues: EMPTY_VALUES,
-    validate: { title: (v) => (v.trim() ? null : 'Titre requis') },
+    validate: { name: (v) => (v.trim() ? null : 'Nom requis') },
   });
 
   async function load() {
     setLoading(true);
     try {
-      setItems(await apiFetch<Specialty[]>('/specialties'));
+      setItems(await apiFetch<PortfolioCategory[]>('/portfolio-categories'));
     } catch (err) {
       notifications.show({
         color: 'red',
@@ -70,27 +69,21 @@ export function SpecialtiesPage() {
     open();
   }
 
-  function openEdit(item: Specialty) {
+  function openEdit(item: PortfolioCategory) {
     setEditing(item);
-    form.setValues({
-      title: item.title,
-      description: item.description ?? '',
-      imageUrl: item.imageUrl ?? '',
-      order: item.order,
-    });
+    form.setValues({ name: item.name, order: item.order });
     open();
   }
 
-  async function handleSubmit(values: SpecialtyFormValues) {
+  async function handleSubmit(values: CategoryFormValues) {
     setSaving(true);
-    const payload = nullifyEmptyStrings(values);
     try {
       if (editing) {
-        await apiFetch(`/specialties/${editing.id}`, { method: 'PUT', body: payload });
+        await apiFetch(`/portfolio-categories/${editing.id}`, { method: 'PUT', body: values });
       } else {
-        await apiFetch('/specialties', { method: 'POST', body: payload });
+        await apiFetch('/portfolio-categories', { method: 'POST', body: values });
       }
-      notifications.show({ color: 'green', title: 'Enregistré', message: 'Spécialité sauvegardée.' });
+      notifications.show({ color: 'green', title: 'Enregistré', message: 'Catégorie sauvegardée.' });
       close();
       await load();
     } catch (err) {
@@ -104,11 +97,17 @@ export function SpecialtiesPage() {
     }
   }
 
-  async function handleDelete(item: Specialty) {
-    if (!window.confirm(`Supprimer la spécialité "${item.title}" ?`)) return;
+  async function handleDelete(item: PortfolioCategory) {
+    if (
+      !window.confirm(
+        `Supprimer la catégorie "${item.name}" ? Les éléments de portfolio qui l'utilisent déjà ne seront pas modifiés.`,
+      )
+    ) {
+      return;
+    }
     try {
-      await apiFetch(`/specialties/${item.id}`, { method: 'DELETE' });
-      notifications.show({ color: 'green', title: 'Supprimé', message: 'Spécialité supprimée.' });
+      await apiFetch(`/portfolio-categories/${item.id}`, { method: 'DELETE' });
+      notifications.show({ color: 'green', title: 'Supprimée', message: 'Catégorie supprimée.' });
       await load();
     } catch (err) {
       notifications.show({
@@ -123,10 +122,10 @@ export function SpecialtiesPage() {
     <Stack>
       <Group justify="space-between">
         <div>
-          <Title order={2}>Spécialités</Title>
+          <Title order={2}>Catégories du portfolio</Title>
           <Text c="dimmed" size="sm">
-            Cliquez sur une spécialité pour gérer son catalogue de photos (galerie affichée
-            au clic sur le site vitrine).
+            Ces catégories sont proposées lors de l'ajout ou de la modification d'un élément du
+            portfolio.
           </Text>
         </div>
         <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
@@ -143,35 +142,16 @@ export function SpecialtiesPage() {
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Ordre</Table.Th>
-              <Table.Th>Titre</Table.Th>
-              <Table.Th>Description</Table.Th>
-              <Table.Th>Catalogue</Table.Th>
+              <Table.Th>Nom</Table.Th>
               <Table.Th />
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {items.map((item) => (
-              <Table.Tr
-                key={item.id}
-                style={{ cursor: 'pointer' }}
-                onClick={() => navigate(`/specialties/${item.id}`)}
-              >
+              <Table.Tr key={item.id}>
                 <Table.Td>{item.order}</Table.Td>
-                <Table.Td>{item.title}</Table.Td>
+                <Table.Td>{item.name}</Table.Td>
                 <Table.Td>
-                  <Text lineClamp={1} maw={400}>
-                    {item.description}
-                  </Text>
-                </Table.Td>
-                <Table.Td>
-                  <Group gap={4}>
-                    <IconPhoto size={14} color="var(--mantine-color-dimmed)" />
-                    <Text size="sm" c="dimmed">
-                      {item.photos.length}
-                    </Text>
-                  </Group>
-                </Table.Td>
-                <Table.Td onClick={(e) => e.stopPropagation()}>
                   <Group gap="xs" justify="flex-end">
                     <ActionIcon variant="light" onClick={() => openEdit(item)} aria-label="Modifier">
                       <IconEdit size={16} />
@@ -190,9 +170,9 @@ export function SpecialtiesPage() {
             ))}
             {items.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={5}>
+                <Table.Td colSpan={3}>
                   <Text c="dimmed" ta="center">
-                    Aucune spécialité pour l'instant.
+                    Aucune catégorie pour l'instant.
                   </Text>
                 </Table.Td>
               </Table.Tr>
@@ -201,15 +181,14 @@ export function SpecialtiesPage() {
         </Table>
       )}
 
-      <Modal opened={opened} onClose={close} title={editing ? 'Modifier la spécialité' : 'Nouvelle spécialité'}>
+      <Modal opened={opened} onClose={close} title={editing ? 'Modifier la catégorie' : 'Nouvelle catégorie'}>
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack>
-            <TextInput label="Titre" required {...form.getInputProps('title')} />
-            <Textarea label="Description" autosize minRows={3} {...form.getInputProps('description')} />
-            <ImageUploadField
-              label="Image"
-              value={form.values.imageUrl}
-              onChange={(url) => form.setFieldValue('imageUrl', url ?? '')}
+            <TextInput
+              label="Nom"
+              placeholder="Portrait, Mariage, Paysage, Événements..."
+              required
+              {...form.getInputProps('name')}
             />
             <NumberInput label="Ordre d'affichage" {...form.getInputProps('order')} />
             <Button type="submit" loading={saving} mt="sm">

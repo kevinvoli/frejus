@@ -1,8 +1,10 @@
 import {
   IsDateString,
   IsEmail,
+  IsInt,
   IsOptional,
   IsString,
+  Min,
   MinLength,
 } from 'class-validator';
 
@@ -31,4 +33,10 @@ export class CreateGalleryDto {
   @IsOptional()
   @IsDateString()
   expiresAt?: string;
+
+  // Nombre maximal d'utilisations du code. Absent/vide = illimité.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxUses?: number;
 }

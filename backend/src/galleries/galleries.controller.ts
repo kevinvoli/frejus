@@ -54,8 +54,11 @@ export class GalleriesController {
   // les routes admin paramétrées (:id) pour éviter tout conflit de matching. ---
 
   @Get('access/:token')
-  getPublicAccess(@Param('token') token: string) {
-    return this.service.getPublicAccess(token);
+  getPublicAccess(
+    @Param('token') token: string,
+    @Query('usage') usageReceipt?: string,
+  ) {
+    return this.service.getPublicAccess(token, usageReceipt);
   }
 
   @Post('access/:token/verify')
@@ -63,7 +66,7 @@ export class GalleriesController {
     @Param('token') token: string,
     @Body() dto: VerifyGalleryPasswordDto,
   ) {
-    return this.service.verifyPassword(token, dto.password);
+    return this.service.verifyPassword(token, dto.password, dto.usage);
   }
 
   @Get('access/:token/media/:mediaId/download')

@@ -4,7 +4,6 @@
 import type { PortfolioItem, Specialty, SiteSettings, Testimonial } from './api/types';
 
 export const DEFAULT_SETTINGS: SiteSettings = {
-  id: 1,
   heroTitle: "Capturer l'instant, créer l'éternel",
   heroSubtitle:
     'Photographe professionnel spécialisé en portrait, mariage et paysages. Basé à Paris, disponible en France et à l\'international.',
@@ -21,7 +20,6 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   instagramUrl: null,
   facebookUrl: null,
   pinterestUrl: null,
-  updatedAt: new Date(0).toISOString(),
 };
 
 export const DEFAULT_SPECIALTIES: Specialty[] = [
@@ -32,6 +30,7 @@ export const DEFAULT_SPECIALTIES: Specialty[] = [
       'Séances photo personnalisées pour capturer votre personnalité et votre essence dans des cadres naturels ou en studio.',
     imageUrl: null,
     order: 0,
+    photos: [],
   },
   {
     id: -2,
@@ -39,6 +38,7 @@ export const DEFAULT_SPECIALTIES: Specialty[] = [
     description: 'Reportage discret et émouvant de votre journée spéciale, pour revivre chaque instant précieux.',
     imageUrl: null,
     order: 1,
+    photos: [],
   },
   {
     id: -3,
@@ -46,6 +46,7 @@ export const DEFAULT_SPECIALTIES: Specialty[] = [
     description: 'Exploration des plus beaux paysages à la recherche de lumières uniques et de perspectives originales.',
     imageUrl: null,
     order: 2,
+    photos: [],
   },
 ];
 

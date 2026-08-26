@@ -53,6 +53,16 @@ export class ClientGallery {
   @Column({ type: 'datetime', name: 'expires_at', nullable: true })
   expiresAt: Date | null;
 
+  // Nombre maximal d'utilisations du code, fixé par le photographe ; null = illimité.
+  // Une "utilisation" = un nouveau navigateur qui déverrouille la galerie (voir
+  // galleries.service.ts, jeton "gallery-usage" mémorisé côté client 30 jours) — un
+  // même navigateur qui revient dans cette fenêtre ne recompte pas.
+  @Column({ type: 'int', name: 'max_uses', nullable: true })
+  maxUses: number | null;
+
+  @Column({ type: 'int', name: 'use_count', default: 0 })
+  useCount: number;
+
   @OneToMany(() => MediaItem, (media) => media.gallery)
   media: MediaItem[];
 

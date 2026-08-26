@@ -13,6 +13,35 @@ interface GalleryViewProps {
 // (affichage direct), ou introuvable/expirée.
 type ViewState = 'loading' | 'password' | 'gallery' | 'not-found';
 
+// Jeton "gallery-usage" mémorisé côté navigateur (30 jours, voir
+// galleries.service.ts) : évite de consommer une nouvelle utilisation du code à
+// chaque visite du même client dans cette fenêtre — le nombre d'utilisations
+// maximal est fixé par l'admin (voir GalleriesPage.tsx côté panneau admin).
+function usageStorageKey(token: string): string {
+  const normalized = token.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return `pixellia-gallery-usage:${normalized}`;
+}
+
+function getStoredUsageToken(token: string): string | null {
+  try {
+    return window.localStorage.getItem(usageStorageKey(token));
+  } catch {
+    // localStorage indisponible (navigation privée, quota...) : on continue sans,
+    // quitte à ce que la visite recompte une utilisation.
+    return null;
+  }
+}
+
+function storeUsageToken(token: string, usageToken: string): void {
+  try {
+    window.localStorage.setItem(usageStorageKey(token), usageToken);
+  } catch {
+    // Idem : pas bloquant si l'écriture échoue.
+  }
+}
+
+const MAX_USES_ERROR_PATTERN = /nombre maximal d'utilisations/i;
+
 const GalleryView: React.FC<GalleryViewProps> = ({ token }) => {
   const [state, setState] = useState<ViewState>('loading');
   const [gallery, setGallery] = useState<GalleryUnlocked | null>(null);
@@ -23,12 +52,15 @@ const GalleryView: React.FC<GalleryViewProps> = ({ token }) => {
 
   useEffect(() => {
     let cancelled = false;
-    apiGet<GalleryAccessResponse>(`/galleries/access/${token}`)
+    const usageToken = getStoredUsageToken(token);
+    const query = usageToken ? `?usage=${encodeURIComponent(usageToken)}` : '';
+    apiGet<GalleryAccessResponse>(`/galleries/access/${token}${query}`)
       .then((data) => {
         if (cancelled) return;
         if (data.requiresPassword) {
           setState('password');
         } else {
+          storeUsageToken(token, data.usageToken);
           setGallery(data);
           setState('gallery');
         }
@@ -50,11 +82,21 @@ const GalleryView: React.FC<GalleryViewProps> = ({ token }) => {
     try {
       const data = await apiPost<GalleryUnlocked>(`/galleries/access/${token}/verify`, {
         password,
+        usage: getStoredUsageToken(token) ?? undefined,
       });
+      storeUsageToken(token, data.usageToken);
       setGallery(data);
       setState('gallery');
     } catch (err) {
-      setPasswordError(err instanceof Error ? err.message : 'Mot de passe incorrect.');
+      const message = err instanceof Error ? err.message : 'Mot de passe incorrect.';
+      if (MAX_USES_ERROR_PATTERN.test(message)) {
+        // Cas terminal (limite d'utilisations atteinte) : comme "introuvable", il n'y a
+        // rien que le client puisse retenter depuis le formulaire de mot de passe.
+        setNotFoundMessage(message);
+        setState('not-found');
+      } else {
+        setPasswordError(message);
+      }
     } finally {
       setVerifying(false);
     }

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -31,7 +32,20 @@ const GALLERY_ACCESS_EXPIRES_IN = '6h';
 const GALLERY_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 const GALLERY_CODE_LENGTH = 8;
 
+// Jeton "utilisation" : preuve, mémorisée côté navigateur (localStorage), qu'un
+// déverrouillage a déjà été compté pour ce couple navigateur/galerie — évite de
+// consommer une nouvelle utilisation à chaque rechargement de page du même client
+// dans les 30 jours (voir décision produit du 26/08, limite d'utilisations du code).
+const GALLERY_USAGE_SCOPE = 'gallery-usage';
+const GALLERY_USAGE_EXPIRES_IN = '30d';
+
 export interface GalleryAccessPayload {
+  scope: string;
+  galleryId: number;
+  token: string;
+}
+
+export interface GalleryUsagePayload {
   scope: string;
   galleryId: number;
   token: string;
@@ -60,6 +74,7 @@ export class GalleriesService {
       accessToken: await this.generateUniqueAccessCode(),
       passwordHash: dto.password ? await bcrypt.hash(dto.password, 10) : null,
       expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+      maxUses: dto.maxUses ?? null,
     });
     const saved = await this.galleryRepo.save(gallery);
     return this.toAdminShape(saved);
@@ -99,7 +114,7 @@ export class GalleriesService {
     dto: UpdateGalleryDto,
   ): Promise<Omit<ClientGallery, 'passwordHash'> & { hasPassword: boolean }> {
     const gallery = await this.findOneEntity(id);
-    const { password, expiresAt, ...rest } = dto;
+    const { password, expiresAt, maxUses, ...rest } = dto;
 
     this.galleryRepo.merge(gallery, rest);
 
@@ -114,6 +129,12 @@ export class GalleriesService {
 
     if (expiresAt !== undefined) {
       gallery.expiresAt = expiresAt ? new Date(expiresAt) : null;
+    }
+
+    // maxUses: undefined => inchangé. null ou absent du formulaire => illimité.
+    // nombre => nouvelle limite (n'affecte pas useCount, déjà consommé reste compté).
+    if (maxUses !== undefined) {
+      gallery.maxUses = maxUses;
     }
 
     const saved = await this.galleryRepo.save(gallery);
@@ -164,15 +185,15 @@ export class GalleriesService {
 
   // --- Accès public (lien partagé au client, sans compte) ---
 
-  async getPublicAccess(token: string) {
+  async getPublicAccess(token: string, usageReceipt?: string) {
     const gallery = await this.findByAccessToken(token);
     if (!gallery.passwordHash) {
-      return this.buildUnlockedPayload(gallery);
+      return this.unlockWithUsageTracking(gallery, usageReceipt);
     }
     return { id: gallery.id, title: gallery.title, requiresPassword: true };
   }
 
-  async verifyPassword(token: string, password: string) {
+  async verifyPassword(token: string, password: string, usageReceipt?: string) {
     const gallery = await this.findByAccessToken(token);
     if (gallery.passwordHash) {
       const matches = await bcrypt.compare(password, gallery.passwordHash);
@@ -180,7 +201,7 @@ export class GalleriesService {
         throw new UnauthorizedException('Mot de passe incorrect');
       }
     }
-    return this.buildUnlockedPayload(gallery);
+    return this.unlockWithUsageTracking(gallery, usageReceipt);
   }
 
   // Vérifie le jeton court-terme émis après déverrouillage, avant de servir un
@@ -294,7 +315,59 @@ export class GalleriesService {
     return gallery;
   }
 
-  private async buildUnlockedPayload(gallery: ClientGallery) {
+  // Vérifie le nombre maximal d'utilisations avant de déverrouiller, en tenant
+  // compte d'un éventuel jeton "gallery-usage" déjà obtenu par ce navigateur (dans ce
+  // cas, ce déverrouillage ne consomme pas une utilisation supplémentaire).
+  private async unlockWithUsageTracking(
+    gallery: ClientGallery,
+    usageReceipt: string | undefined,
+  ) {
+    const alreadyCounted = await this.hasValidUsageReceipt(
+      gallery,
+      usageReceipt,
+    );
+    if (!alreadyCounted) {
+      if (gallery.maxUses !== null && gallery.useCount >= gallery.maxUses) {
+        throw new ForbiddenException(
+          "Ce code a atteint son nombre maximal d'utilisations",
+        );
+      }
+      gallery.useCount += 1;
+      await this.galleryRepo.update(gallery.id, { useCount: gallery.useCount });
+    }
+    const usageToken = await this.jwtService.signAsync(
+      {
+        scope: GALLERY_USAGE_SCOPE,
+        galleryId: gallery.id,
+        token: gallery.accessToken,
+      },
+      { expiresIn: GALLERY_USAGE_EXPIRES_IN },
+    );
+    return this.buildUnlockedPayload(gallery, usageToken);
+  }
+
+  private async hasValidUsageReceipt(
+    gallery: ClientGallery,
+    usageReceipt: string | undefined,
+  ): Promise<boolean> {
+    if (!usageReceipt) return false;
+    try {
+      const payload =
+        await this.jwtService.verifyAsync<GalleryUsagePayload>(usageReceipt);
+      return (
+        payload.scope === GALLERY_USAGE_SCOPE &&
+        payload.galleryId === gallery.id &&
+        payload.token === gallery.accessToken
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private async buildUnlockedPayload(
+    gallery: ClientGallery,
+    usageToken: string,
+  ) {
     const accessJwt = await this.jwtService.signAsync(
       {
         scope: GALLERY_ACCESS_SCOPE,
@@ -310,6 +383,7 @@ export class GalleriesService {
       description: gallery.description,
       requiresPassword: false,
       accessJwt,
+      usageToken,
       media: this.sortMedia(gallery.media).map((item) => ({
         id: item.id,
         type: item.type,

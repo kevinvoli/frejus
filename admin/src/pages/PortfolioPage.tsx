@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActionIcon,
+  Anchor,
   Badge,
   Button,
   Center,
@@ -8,6 +9,7 @@ import {
   Loader,
   Modal,
   NumberInput,
+  Select,
   Stack,
   Switch,
   Table,
@@ -19,8 +21,9 @@ import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconEdit, IconPlus, IconTrash } from '@tabler/icons-react';
+import { Link } from 'react-router-dom';
 import { apiFetch, ApiError } from '../api/client';
-import type { PortfolioItem } from '../api/types';
+import type { PortfolioCategory, PortfolioItem } from '../api/types';
 import { ImageUploadField } from '../components/ImageUploadField';
 
 interface PortfolioFormValues {
@@ -41,6 +44,7 @@ const EMPTY_VALUES: PortfolioFormValues = {
 
 export function PortfolioPage() {
   const [items, setItems] = useState<PortfolioItem[]>([]);
+  const [categories, setCategories] = useState<PortfolioCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<PortfolioItem | null>(null);
   const [opened, { open, close }] = useDisclosure(false);
@@ -59,7 +63,12 @@ export function PortfolioPage() {
     setLoading(true);
     try {
       // /admin/all : montre aussi les éléments non publiés (brouillons), utile pour l'admin.
-      setItems(await apiFetch<PortfolioItem[]>('/portfolio/admin/all'));
+      const [portfolioItems, portfolioCategories] = await Promise.all([
+        apiFetch<PortfolioItem[]>('/portfolio/admin/all'),
+        apiFetch<PortfolioCategory[]>('/portfolio-categories'),
+      ]);
+      setItems(portfolioItems);
+      setCategories(portfolioCategories);
     } catch (err) {
       notifications.show({
         color: 'red',
@@ -74,6 +83,18 @@ export function PortfolioPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  // Catégories proposées dans le sélecteur : la liste gérée dans "Catégories du
+  // portfolio", complétée par la catégorie actuelle de l'élément modifié si elle
+  // n'y figure plus (catégorie renommée/supprimée depuis), pour ne pas l'effacer
+  // silencieusement à l'ouverture du formulaire.
+  const categoryOptions = (() => {
+    const names = categories.map((c) => c.name);
+    if (editing && editing.category && !names.includes(editing.category)) {
+      return [editing.category, ...names];
+    }
+    return names;
+  })();
 
   function openCreate() {
     setEditing(null);
@@ -203,10 +224,17 @@ export function PortfolioPage() {
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack>
             <TextInput label="Titre" required {...form.getInputProps('title')} />
-            <TextInput
+            <Select
               label="Catégorie"
-              placeholder="Portrait, Mariage, Paysage, Événements..."
+              placeholder="Choisir une catégorie"
+              data={categoryOptions}
+              searchable
               required
+              description={
+                <Anchor component={Link} to="/portfolio-categories" size="xs">
+                  Gérer les catégories
+                </Anchor>
+              }
               {...form.getInputProps('category')}
             />
             <ImageUploadField

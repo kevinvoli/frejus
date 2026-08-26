@@ -51,13 +51,20 @@ Tous préfixés par `/api`. Les routes marquées 🔒 nécessitent un header
 | Méthode | Route | Description |
 |---|---|---|
 | POST | `/auth/login` | Connexion admin, retourne un JWT |
-| GET | `/settings` | Contenu éditable du site (hero, à propos, coordonnées, réseaux) |
-| PUT 🔒 | `/settings` | Mise à jour de ce contenu |
-| GET | `/specialties` | Liste des spécialités |
+| GET | `/settings` | Contenu éditable du site, agrégé depuis les 4 tables ci-dessous (public, consommé par le site vitrine) |
+| GET/PUT 🔒 | `/settings/hero` | Section Accueil (titre d'accroche, sous-titre, image) |
+| GET/PUT 🔒 | `/settings/about` | Section À propos (texte, photo) |
+| GET/PUT 🔒 | `/settings/contact` | Section Studio et contact (nom, adresse, ville, téléphone, email, horaires) |
+| GET/PUT 🔒 | `/settings/social` | Section Réseaux sociaux (Instagram, Facebook, Pinterest) |
+| GET | `/specialties` | Liste des spécialités (chacune avec son tableau `photos` de catalogue) |
 | POST/PUT/DELETE 🔒 | `/specialties[/:id]` | CRUD spécialités |
+| POST 🔒 | `/specialties/:id/photos` | Ajout de photos au catalogue (`multipart/form-data`, champ `files`, jusqu'à 30 fichiers) |
+| DELETE 🔒 | `/specialties/:id/photos/:photoId` | Suppression d'une photo du catalogue |
 | GET | `/portfolio?category=Portrait` | Portfolio publié, filtrable par catégorie |
 | GET 🔒 | `/portfolio/admin/all` | Portfolio complet (y compris non publié) |
 | POST/PUT/DELETE 🔒 | `/portfolio[/:id]` | CRUD portfolio |
+| GET/POST 🔒 | `/portfolio-categories` | Liste des catégories de portfolio gérables dans l'admin (texte libre côté `PortfolioItem.category`, pas de relation) |
+| PUT/DELETE 🔒 | `/portfolio-categories/:id` | Modification/suppression d'une catégorie |
 | GET | `/testimonials` | Témoignages publiés |
 | GET 🔒 | `/testimonials/admin/all` | Tous les témoignages |
 | POST/PUT/DELETE 🔒 | `/testimonials[/:id]` | CRUD témoignages |
@@ -69,8 +76,8 @@ Tous préfixés par `/api`. Les routes marquées 🔒 nécessitent un header
 | POST/PUT/DELETE 🔒 | `/galleries[/:id]` | CRUD galeries |
 | POST 🔒 | `/galleries/:id/media` | Upload multi-fichiers (photos/vidéos, 200 Mo max) |
 | DELETE 🔒 | `/galleries/:id/media/:mediaId` | Suppression d'un média |
-| GET | `/galleries/access/:token` | Accès public à une galerie (public) |
-| POST | `/galleries/access/:token/verify` | Vérification du mot de passe (public) |
+| GET | `/galleries/access/:token?usage=<jwt>` | Accès public à une galerie (public). Le paramètre `usage`, optionnel, est le reçu d'utilisation mémorisé par le navigateur (voir ci-dessous) — sans lui, l'accès compte comme une nouvelle utilisation vis-à-vis de la limite `maxUses` |
+| POST | `/galleries/access/:token/verify` | Vérification du mot de passe (public), corps `{ password, usage? }` — même logique de reçu d'utilisation que ci-dessus |
 | GET | `/galleries/access/:token/media/:mediaId/download?access=<jwt>` | Téléchargement d'un fichier (public) |
 | GET | `/galleries/access/:token/download-all?access=<jwt>` | Téléchargement de la galerie en ZIP (public) |
 | GET | `/health` | Healthcheck |

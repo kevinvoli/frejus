@@ -254,6 +254,126 @@ nav a:hover {
     color: var(--noir);
 }
 
+/* Catalogue de photos d'une spécialité : la carte devient cliquable dès qu'elle a
+   au moins une photo de catalogue, et ouvre la galerie plein écran (Lightbox). */
+.specialty-card-clickable {
+    cursor: pointer;
+}
+
+.specialty-card-clickable:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+}
+
+.specialty-image {
+    position: relative;
+}
+
+.specialty-catalog-badge {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    background-color: rgba(26, 26, 26, 0.75);
+    color: var(--blanc);
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.25s, transform 0.25s;
+}
+
+.specialty-card-clickable:hover .specialty-catalog-badge,
+.specialty-card-clickable:focus-visible .specialty-catalog-badge {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* LIGHTBOX (galerie plein écran du catalogue d'une spécialité) */
+.lightbox-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.9);
+    padding: 40px 20px;
+}
+
+.lightbox-close {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    background: none;
+    border: none;
+    color: var(--blanc);
+    font-size: 2.5rem;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 1001;
+}
+
+.lightbox-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.lightbox-nav {
+    background: none;
+    border: none;
+    color: var(--blanc);
+    font-size: 3rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 10px;
+    flex-shrink: 0;
+}
+
+.lightbox-nav:hover {
+    color: var(--accent);
+}
+
+.lightbox-figure {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 80vw;
+    max-height: 85vh;
+    margin: 0;
+}
+
+.lightbox-figure img {
+    max-width: 100%;
+    max-height: 75vh;
+    object-fit: contain;
+    border-radius: 4px;
+}
+
+.lightbox-figure figcaption {
+    margin-top: 12px;
+    color: var(--blanc);
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+@media (max-width: 768px) {
+    .lightbox-nav {
+        font-size: 2rem;
+        padding: 4px;
+    }
+
+    .lightbox-figure {
+        max-width: 90vw;
+    }
+}
+
 /* PORTFOLIO */
 .portfolio {
     padding: 100px 0;

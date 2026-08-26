@@ -2,8 +2,13 @@
 // Dupliqués volontairement plutôt que partagés via un package commun — même choix
 // pragmatique que dans admin/src/api/types.ts.
 
+// Agrégat public de GET /settings : le backend fusionne 4 tables (une par section du
+// panneau admin — accueil, à propos, studio/contact, réseaux sociaux, voir
+// backend/src/settings) en une seule forme plate, inchangée pour le site vitrine
+// depuis la refonte du panneau admin du 26/08 (voir docs/ANALYSE-PLAN-BACKEND.md).
+// Plus d'`id`/`updatedAt` uniques : ces notions n'ont plus de sens pour un agrégat de
+// 4 lignes distinctes.
 export interface SiteSettings {
-  id: number;
   heroTitle: string | null;
   heroSubtitle: string | null;
   heroImageUrl: string | null;
@@ -18,7 +23,15 @@ export interface SiteSettings {
   instagramUrl: string | null;
   facebookUrl: string | null;
   pinterestUrl: string | null;
-  updatedAt: string;
+}
+
+// Catalogue de photos d'une spécialité : distinct de `imageUrl`, qui reste l'image de
+// premier plan affichée sur la carte. Le catalogue s'ouvre en galerie (lightbox) au
+// clic sur la carte, quand il contient au moins une photo.
+export interface SpecialtyPhoto {
+  id: number;
+  fileUrl: string;
+  order: number;
 }
 
 export interface Specialty {
@@ -27,6 +40,7 @@ export interface Specialty {
   description: string | null;
   imageUrl: string | null;
   order: number;
+  photos: SpecialtyPhoto[];
 }
 
 export interface PortfolioItem {
@@ -78,6 +92,7 @@ export interface GalleryUnlocked {
   description: string | null;
   requiresPassword: false;
   accessJwt: string;
+  usageToken: string;
   media: GalleryMedia[];
 }
 
