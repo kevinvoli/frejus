@@ -27,6 +27,7 @@ import { CreateGalleryDto } from './dto/create-gallery.dto';
 import { UpdateGalleryDto } from './dto/update-gallery.dto';
 import { VerifyGalleryPasswordDto } from './dto/verify-gallery-password.dto';
 
+
 const GALLERIES_UPLOAD_DIR = './uploads/galleries';
 
 // Médiathèque : seuls des photos et vidéos peuvent être livrées à un client, jamais

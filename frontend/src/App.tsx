@@ -13,6 +13,7 @@ import Contact from './components/Contact';
 import Footer from './components/Footer';
 import GalleryView from './components/GalleryView';
 
+
 const App: React.FC = () => {
   // Médiathèque cliente : affiche la galerie privée à la place du site vitrine, sans
   // routeur dédié (voir GalleryView.tsx). Deux façons d'y arriver : un lien direct

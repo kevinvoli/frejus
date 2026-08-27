@@ -13,6 +13,7 @@ import { GalleriesPage } from './pages/GalleriesPage';
 import { GalleryDetailPage } from './pages/GalleryDetailPage';
 import { SpecialtyDetailPage } from './pages/SpecialtyDetailPage';
 
+
 export default function App() {
   return (
     <BrowserRouter>
