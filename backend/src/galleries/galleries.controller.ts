@@ -22,11 +22,11 @@ import { randomUUID } from 'crypto';
 import { mkdirSync } from 'fs';
 import archiver from 'archiver';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { assertUploadAllowed } from '../common/disk-usage';
 import { GalleriesService } from './galleries.service';
 import { CreateGalleryDto } from './dto/create-gallery.dto';
 import { UpdateGalleryDto } from './dto/update-gallery.dto';
 import { VerifyGalleryPasswordDto } from './dto/verify-gallery-password.dto';
-
 
 const GALLERIES_UPLOAD_DIR = './uploads/galleries';
 
@@ -165,6 +165,12 @@ export class GalleriesController {
       }),
       limits: { fileSize: MAX_FILE_SIZE_BYTES },
       fileFilter: (_req, file, callback) => {
+        try {
+          assertUploadAllowed();
+        } catch (err) {
+          callback(err as Error, false);
+          return;
+        }
         if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
           callback(
             new BadRequestException(

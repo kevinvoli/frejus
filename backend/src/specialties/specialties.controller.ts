@@ -18,6 +18,7 @@ import { extname } from 'path';
 import { randomUUID } from 'crypto';
 import { mkdirSync } from 'fs';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { assertUploadAllowed } from '../common/disk-usage';
 import { SpecialtiesService } from './specialties.service';
 import { CreateSpecialtyDto } from './dto/create-specialty.dto';
 import { UpdateSpecialtyDto } from './dto/update-specialty.dto';
@@ -88,6 +89,12 @@ export class SpecialtiesController {
       }),
       limits: { fileSize: MAX_FILE_SIZE_BYTES },
       fileFilter: (_req, file, callback) => {
+        try {
+          assertUploadAllowed();
+        } catch (err) {
+          callback(err as Error, false);
+          return;
+        }
         if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
           callback(
             new BadRequestException("Format d'image non supporté"),

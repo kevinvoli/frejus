@@ -12,7 +12,7 @@ import { ContactMessagesPage } from './pages/ContactMessagesPage';
 import { GalleriesPage } from './pages/GalleriesPage';
 import { GalleryDetailPage } from './pages/GalleryDetailPage';
 import { SpecialtyDetailPage } from './pages/SpecialtyDetailPage';
-
+import { StoragePage } from './pages/StoragePage';
 
 export default function App() {
   return (
@@ -37,6 +37,7 @@ export default function App() {
             <Route path="/galleries" element={<GalleriesPage />} />
             <Route path="/galleries/:id" element={<GalleryDetailPage />} />
             <Route path="/contact-messages" element={<ContactMessagesPage />} />
+            <Route path="/storage" element={<StoragePage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

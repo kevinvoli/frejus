@@ -29,6 +29,14 @@ export class SpecialtyPhoto {
   @Column({ type: 'varchar', name: 'file_url', length: 500 })
   fileUrl: string;
 
+  // Utilisé par le tableau de bord "Stockage" du panneau admin (voir
+  // backend/src/storage) pour chiffrer l'espace occupé par les catalogues de
+  // spécialités sans avoir à parcourir le disque. Les photos ajoutées avant
+  // l'introduction de ce champ ont une valeur de 0 (imprécision cosmétique connue,
+  // sans impact fonctionnel — voir docs/ANALYSE-PLAN-BACKEND.md).
+  @Column({ name: 'size_bytes', default: 0 })
+  sizeBytes: number;
+
   @Column({ default: 0 })
   order: number;
 

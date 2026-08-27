@@ -31,6 +31,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { apiFetch, ApiError, formatGalleryCode } from '../api/client';
 import type { GalleryListItem } from '../api/types';
+import { formatBytes } from '../utils/formatBytes';
 
 interface GalleryFormValues {
   title: string;
@@ -213,6 +214,7 @@ export function GalleriesPage() {
               <Table.Th>Client</Table.Th>
               <Table.Th>Code</Table.Th>
               <Table.Th>Médias</Table.Th>
+              <Table.Th>Taille</Table.Th>
               <Table.Th>Utilisations</Table.Th>
               <Table.Th>Accès</Table.Th>
               <Table.Th />
@@ -247,6 +249,7 @@ export function GalleriesPage() {
                   </Tooltip>
                 </Table.Td>
                 <Table.Td>{gallery.mediaCount}</Table.Td>
+                <Table.Td>{formatBytes(gallery.totalSizeBytes)}</Table.Td>
                 <Table.Td>
                   <Tooltip
                     label={
@@ -262,16 +265,25 @@ export function GalleriesPage() {
                   </Tooltip>
                 </Table.Td>
                 <Table.Td>
-                  <Tooltip label={gallery.hasPassword ? 'Protégée par mot de passe' : 'Accès libre par code'}>
-                    <Badge
-                      color={gallery.hasPassword ? 'brand' : 'gray'}
-                      leftSection={
-                        gallery.hasPassword ? <IconLock size={12} /> : <IconLockOpen size={12} />
-                      }
-                    >
-                      {gallery.hasPassword ? 'Protégée' : 'Libre'}
-                    </Badge>
-                  </Tooltip>
+                  <Group gap={4}>
+                    <Tooltip label={gallery.hasPassword ? 'Protégée par mot de passe' : 'Accès libre par code'}>
+                      <Badge
+                        color={gallery.hasPassword ? 'brand' : 'gray'}
+                        leftSection={
+                          gallery.hasPassword ? <IconLock size={12} /> : <IconLockOpen size={12} />
+                        }
+                      >
+                        {gallery.hasPassword ? 'Protégée' : 'Libre'}
+                      </Badge>
+                    </Tooltip>
+                    {gallery.expired && (
+                      <Tooltip label="Lien expiré ou nombre d'utilisations atteint — voir le tableau de bord Stockage">
+                        <Badge color="orange" variant="light">
+                          Expirée
+                        </Badge>
+                      </Tooltip>
+                    )}
+                  </Group>
                 </Table.Td>
                 <Table.Td onClick={(e) => e.stopPropagation()}>
                   <Group gap="xs" justify="flex-end">
@@ -299,7 +311,7 @@ export function GalleriesPage() {
             ))}
             {galleries.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={7}>
+                <Table.Td colSpan={8}>
                   <Text c="dimmed" ta="center">
                     Aucune galerie pour l'instant.
                   </Text>

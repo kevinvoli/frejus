@@ -80,6 +80,7 @@ Tous préfixés par `/api`. Les routes marquées 🔒 nécessitent un header
 | POST | `/galleries/access/:token/verify` | Vérification du mot de passe (public), corps `{ password, usage? }` — même logique de reçu d'utilisation que ci-dessus |
 | GET | `/galleries/access/:token/media/:mediaId/download?access=<jwt>` | Téléchargement d'un fichier (public) |
 | GET | `/galleries/access/:token/download-all?access=<jwt>` | Téléchargement de la galerie en ZIP (public) |
+| GET 🔒 | `/storage` | Tableau de bord de l'espace disque (médiathèque, catalogues de spécialités, galeries expirées) |
 | GET | `/health` | Healthcheck |
 
 ## Déploiement

@@ -147,6 +147,10 @@ export interface GalleryListItem {
   maxUses: number | null;
   useCount: number;
   mediaCount: number;
+  totalSizeBytes: number;
+  // Lien expiré ou nombre d'utilisations atteint (voir tableau de bord Stockage) —
+  // informatif seulement, aucune suppression automatique n'est faite côté serveur.
+  expired: boolean;
   hasPassword: boolean;
   createdAt: string;
   updatedAt: string;
@@ -167,4 +171,60 @@ export interface ClientGallery {
   hasPassword: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+// Tableau de bord "Stockage" (voir backend/src/storage) : vue d'ensemble de
+// l'espace disque occupé par les médias, pour repérer manuellement ce qui prend le
+// plus de place. Aucune suppression automatique n'est faite côté serveur.
+export interface DiskUsage {
+  totalBytes: number;
+  usedBytes: number;
+  availableBytes: number;
+  usedPercent: number;
+  alertThresholdPercent: number;
+  hardLimitPercent: number;
+  alert: boolean;
+}
+
+export interface StorageBreakdown {
+  galleries: { totalBytes: number; mediaCount: number };
+  specialtyPhotos: { totalBytes: number; photoCount: number };
+  misc: { totalBytes: number };
+}
+
+export interface TopGallery {
+  id: number;
+  title: string;
+  totalBytes: number;
+  mediaCount: number;
+}
+
+export interface ExpiredGallery {
+  id: number;
+  title: string;
+  clientName: string;
+  expiresAt: string | null;
+  maxUses: number | null;
+  useCount: number;
+  totalBytes: number;
+  mediaCount: number;
+}
+
+// Quota d'espace propre à ce projet (indépendant du % d'espace disque déjà utilisé
+// par le reste du VPS, voir DiskUsage ci-dessus) — configuré uniquement via la
+// variable d'environnement MEDIA_STORAGE_QUOTA_GB côté backend, non modifiable
+// depuis ce panneau admin. `null` si le quota est désactivé côté serveur.
+export interface MediaQuotaStatus {
+  quotaBytes: number;
+  usedBytes: number;
+  usedPercent: number;
+  alert: boolean;
+}
+
+export interface StorageOverview {
+  disk: DiskUsage;
+  mediaQuota: MediaQuotaStatus | null;
+  breakdown: StorageBreakdown;
+  topGalleries: TopGallery[];
+  expiredGalleries: ExpiredGallery[];
 }

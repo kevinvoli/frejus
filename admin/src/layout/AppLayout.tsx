@@ -12,8 +12,10 @@ import {
   ThemeIcon,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import type { ComponentType } from 'react';
 import {
   IconCamera,
+  IconDatabase,
   IconLibraryPhoto,
   IconLogout,
   IconMessage,
@@ -26,11 +28,17 @@ import {
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 
+interface NavItem {
+  to: string;
+  label: string;
+  icon: ComponentType<{ size?: number }>;
+}
+
 // Palette et disposition inspirées de la maquette fournie par le client (frejus.jpg,
 // dashboard "Vizora") : sidebar vert foncé avec item actif en pastille blanche, fond
 // de contenu très clair, et le contenu de chaque page posé sur une carte blanche
 // arrondie — cf. src/main.tsx pour la palette "brand" du thème Mantine.
-const NAV_ITEMS = [
+const NAV_ITEMS: NavItem[] = [
   { to: '/settings', label: 'Réglages du site', icon: IconSettings },
   { to: '/specialties', label: 'Spécialités', icon: IconStar },
   { to: '/portfolio', label: 'Portfolio', icon: IconPhoto },
@@ -38,6 +46,12 @@ const NAV_ITEMS = [
   { to: '/galleries', label: 'Médiathèque', icon: IconLibraryPhoto },
   { to: '/testimonials', label: 'Témoignages', icon: IconMessage },
   { to: '/contact-messages', label: 'Messages de contact', icon: IconMessageCircle },
+];
+
+// Section distincte du contenu éditable : suivi de l'espace disque occupé par les
+// médias (voir docs/ANALYSE-PLAN-BACKEND.md, stratégie de gestion des médias).
+const NAV_ITEMS_SYSTEM: NavItem[] = [
+  { to: '/storage', label: 'Stockage', icon: IconDatabase },
 ];
 
 export function AppLayout() {
@@ -52,6 +66,42 @@ export function AppLayout() {
   }
 
   const initial = user?.email?.[0]?.toUpperCase() ?? '?';
+
+  // Comparaison avec bornage sur "/" : évite qu'un préfixe partagé entre deux routes
+  // (ex. /portfolio et /portfolio-categories) ne mette en surbrillance les deux
+  // items de navigation à la fois.
+  function isActive(to: string): boolean {
+    return location.pathname === to || location.pathname.startsWith(`${to}/`);
+  }
+
+  function renderNavItem(item: NavItem) {
+    const active = isActive(item.to);
+    return (
+      <MantineNavLink
+        key={item.to}
+        component={NavLink}
+        to={item.to}
+        label={item.label}
+        leftSection={<item.icon size={18} />}
+        active={active}
+        variant="subtle"
+        styles={{
+          root: {
+            borderRadius: 8,
+            backgroundColor: active ? 'white' : 'transparent',
+          },
+          label: {
+            color: active ? 'var(--mantine-color-brand-9)' : 'var(--mantine-color-brand-1)',
+            fontWeight: active ? 600 : 500,
+            fontSize: 14,
+          },
+          section: {
+            color: active ? 'var(--mantine-color-brand-7)' : 'var(--mantine-color-brand-2)',
+          },
+        }}
+      />
+    );
+  }
 
   return (
     <AppShell
@@ -88,40 +138,21 @@ export function AppLayout() {
             Contenu du site
           </Text>
 
-          <Stack gap={2}>
-            {NAV_ITEMS.map((item) => {
-              // Comparaison avec bornage sur "/" : évite qu'un préfixe partagé entre
-              // deux routes (ex. /portfolio et /portfolio-categories) ne mette en
-              // surbrillance les deux items à la fois.
-              const active =
-                location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
-              return (
-                <MantineNavLink
-                  key={item.to}
-                  component={NavLink}
-                  to={item.to}
-                  label={item.label}
-                  leftSection={<item.icon size={18} />}
-                  active={active}
-                  variant="subtle"
-                  styles={{
-                    root: {
-                      borderRadius: 8,
-                      backgroundColor: active ? 'white' : 'transparent',
-                    },
-                    label: {
-                      color: active ? 'var(--mantine-color-brand-9)' : 'var(--mantine-color-brand-1)',
-                      fontWeight: active ? 600 : 500,
-                      fontSize: 14,
-                    },
-                    section: {
-                      color: active ? 'var(--mantine-color-brand-7)' : 'var(--mantine-color-brand-2)',
-                    },
-                  }}
-                />
-              );
-            })}
-          </Stack>
+          <Stack gap={2}>{NAV_ITEMS.map(renderNavItem)}</Stack>
+
+          <Text
+            c="brand.3"
+            size="xs"
+            fw={600}
+            tt="uppercase"
+            px="xs"
+            pt="lg"
+            pb={6}
+            style={{ letterSpacing: 0.5 }}
+          >
+            Système
+          </Text>
+          <Stack gap={2}>{NAV_ITEMS_SYSTEM.map(renderNavItem)}</Stack>
 
           <Box style={{ flexGrow: 1 }} />
 

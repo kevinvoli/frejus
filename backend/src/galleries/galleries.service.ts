@@ -16,6 +16,8 @@ import { ClientGallery } from './entities/client-gallery.entity';
 import { MediaItem, MediaType } from './entities/media-item.entity';
 import { CreateGalleryDto } from './dto/create-gallery.dto';
 import { UpdateGalleryDto } from './dto/update-gallery.dto';
+import { isGalleryExpired } from './gallery-expiry.util';
+import { StorageService } from '../storage/storage.service';
 
 // Jeton d'accès aux téléchargements : émis après déverrouillage d'une galerie (ou
 // immédiatement si elle n'a pas de mot de passe), scope court (6h) plutôt qu'un vrai
@@ -59,6 +61,7 @@ export class GalleriesService {
     @InjectRepository(MediaItem)
     private readonly mediaRepo: Repository<MediaItem>,
     private readonly jwtService: JwtService,
+    private readonly storageService: StorageService,
   ) {}
 
   // --- Administration (routes protégées JWT admin) ---
@@ -84,6 +87,8 @@ export class GalleriesService {
     Array<
       Omit<ClientGallery, 'media' | 'passwordHash'> & {
         mediaCount: number;
+        totalSizeBytes: number;
+        expired: boolean;
         hasPassword: boolean;
       }
     >
@@ -95,9 +100,15 @@ export class GalleriesService {
       relations: { media: true },
       order: { createdAt: 'DESC' },
     });
+    const now = new Date();
     return galleries.map(({ media, passwordHash, ...rest }) => ({
       ...rest,
       mediaCount: media.length,
+      totalSizeBytes: media.reduce((sum, item) => sum + item.sizeBytes, 0),
+      // Signalé dans le panneau admin (voir GalleriesPage.tsx et le tableau de bord
+      // Stockage) pour aider à repérer manuellement les galeries à supprimer —
+      // aucune suppression automatique n'est faite ici (voir docs/ANALYSE-PLAN-BACKEND.md).
+      expired: isGalleryExpired(rest, now),
       hasPassword: passwordHash !== null,
     }));
   }
@@ -155,6 +166,23 @@ export class GalleriesService {
     files: Express.Multer.File[],
   ): Promise<MediaItem[]> {
     await this.findOneEntity(galleryId); // 404 si la galerie n'existe pas
+
+    // multer a déjà écrit les fichiers sur le disque à ce stade (l'interceptor
+    // s'exécute avant le handler) : si le quota du projet est dépassé, on doit donc
+    // nettoyer ces fichiers fraîchement écrits avant de laisser l'exception remonter,
+    // pour ne jamais laisser de fichier orphelin (sans ligne en base) sur le disque.
+    const additionalBytes = files.reduce((sum, file) => sum + file.size, 0);
+    try {
+      await this.storageService.assertWithinMediaQuota(additionalBytes);
+    } catch (err) {
+      await Promise.all(
+        files.map((file) =>
+          this.deleteFileQuietly(`/uploads/galleries/${file.filename}`),
+        ),
+      );
+      throw err;
+    }
+
     const items = files.map((file) =>
       this.mediaRepo.create({
         galleryId,

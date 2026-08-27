@@ -11,6 +11,7 @@ import { Specialty } from './entities/specialty.entity';
 import { SpecialtyPhoto } from './entities/specialty-photo.entity';
 import { CreateSpecialtyDto } from './dto/create-specialty.dto';
 import { UpdateSpecialtyDto } from './dto/update-specialty.dto';
+import { StorageService } from '../storage/storage.service';
 
 @Injectable()
 export class SpecialtiesService {
@@ -19,6 +20,7 @@ export class SpecialtiesService {
     private readonly repo: Repository<Specialty>,
     @InjectRepository(SpecialtyPhoto)
     private readonly photoRepo: Repository<SpecialtyPhoto>,
+    private readonly storageService: StorageService,
   ) {}
 
   // Le catalogue de photos est renvoyé trié pour le site vitrine (lightbox au clic
@@ -75,10 +77,28 @@ export class SpecialtiesService {
     files: Express.Multer.File[],
   ): Promise<Specialty> {
     await this.findOne(specialtyId); // 404 si la spécialité n'existe pas
+
+    // multer a déjà écrit les fichiers sur le disque à ce stade : si le quota du
+    // projet est dépassé, on les supprime avant de laisser l'exception remonter,
+    // pour ne jamais laisser de fichier orphelin sur le disque (voir galleries.service.ts,
+    // addMedia(), pour le même motif).
+    const additionalBytes = files.reduce((sum, file) => sum + file.size, 0);
+    try {
+      await this.storageService.assertWithinMediaQuota(additionalBytes);
+    } catch (err) {
+      await Promise.all(
+        files.map((file) =>
+          this.deleteFileQuietly(`/uploads/specialties/${file.filename}`),
+        ),
+      );
+      throw err;
+    }
+
     const items = files.map((file) =>
       this.photoRepo.create({
         specialtyId,
         fileUrl: `/uploads/specialties/${file.filename}`,
+        sizeBytes: file.size,
       }),
     );
     await this.photoRepo.save(items);
