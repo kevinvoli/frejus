@@ -532,6 +532,48 @@ quota. Vérifié aussi que `MEDIA_STORAGE_QUOTA_GB=0` désactive bien le quota (
 la limite de 100 Go. Testé en navigateur (Playwright) : la nouvelle carte s'affiche correctement
 dans les deux cas (quota actif avec jauge, quota désactivé avec message dédié).
 
+## Mise à jour du 27 août 2026 (suite) — page dédiée par spécialité (galerie façon Pinterest + tarifs)
+
+Demande client : au clic sur une spécialité, envoyer le visiteur vers une page dédiée qui
+affiche ses photos en grille façon Pinterest, avec une section donnant les tarifs des
+sous-services de cette spécialité (ex. pour "Portrait" : "Shooting individuel" à 15 000 F CFA
+pour 1 personne et 4 photos, "Shooting familial" à 30 000 F pour 4 photos, "Shooting enfants" à
+20 000 F, "Mode" à 35 000 F...), modifiables depuis le panneau admin. Remplace le comportement
+précédent (ouverture du catalogue en galerie plein écran par-dessus la page d'accueil).
+
+- **Backend** — nouvelle entité `SpecialtyTariff` (`specialty_tariffs`, voir
+  `backend/src/specialties/entities/specialty-tariff.entity.ts`) : une ligne = un sous-service
+  facturé séparément, avec `name` (ex. "Shooting individuel"), `price` (entier, francs CFA),
+  `detail` (texte libre pour la quantité/les conditions — "4 photos", "1 personne, 4 photos" —
+  plutôt que des colonnes rigides, pour rester flexible sur ce que le photographe veut afficher)
+  et `order`. Rattachée à `Specialty` par clé étrangère `ON DELETE CASCADE` (supprimée
+  automatiquement avec sa spécialité, comme les photos du catalogue). Nouvelles routes imbriquées
+  `POST/PUT/DELETE /specialties/:id/tariffs[/:tariffId]`, protégées JWT comme le reste de la
+  gestion d'une spécialité ; la lecture reste publique, via le tableau `tariffs` déjà inclus dans
+  `GET /specialties` et `GET /specialties/:id`.
+- **Panneau admin** — la page de détail d'une spécialité (`SpecialtyDetailPage.tsx`, déjà utilisée
+  pour le catalogue de photos) reçoit une nouvelle section "Tarifs" : tableau + formulaire modal
+  (nom, prix, détail, ordre) avec les mêmes opérations CRUD que le reste du panneau.
+- **Site vitrine** — nouvelle page dédiée par spécialité, accessible via `/?specialite=<id>` (même
+  principe que la médiathèque cliente `/?galerie=<code>` : pas de routeur dédié pour ce site,
+  décision produit constante depuis l'ajout de la médiathèque). Une carte de spécialité devient
+  cliquable dès qu'elle a des photos de catalogue et/ou des tarifs, et envoie vers cette page au
+  lieu d'ouvrir la galerie plein écran par-dessus la page d'accueil comme avant. La page affiche :
+  la grille tarifaire (cartes prix), puis la galerie de photos en colonnes CSS (`column-count`,
+  responsive : 2 colonnes en mobile, 3 puis 4 sur écran plus large) façon Pinterest — chaque photo
+  garde son ratio d'origine au lieu d'être recadrée en carré, et reste cliquable pour s'agrandir en
+  plein écran (composant `Lightbox.tsx` existant, réutilisé tel quel).
+
+**Vérification effectuée** : build backend + admin + frontend sans erreur (lint backend/admin
+également). CRUD des tarifs testé de bout en bout via l'API (création, modification, suppression,
+y compris le cas `price: 0` et la suppression en cascade avec la spécialité) et via le panneau
+admin en navigateur (Playwright) : ajout d'un tarif "Duo" à 25 000 F, modification de son prix,
+puis suppression, chaque étape reflétée immédiatement dans le tableau. Page dédiée du site vitrine
+testée avec 4 tarifs et 6 photos de tailles variées : grille tarifaire et galerie Pinterest
+s'affichent correctement, le clic sur une photo l'agrandit en plein écran avec navigation
+précédent/suivant, et le lien du logo ramène bien à la page d'accueil (URL nettoyée du paramètre
+`?specialite=`).
+
 ## 1. Résumé
 
 Le projet `frejus` est actuellement un **site vitrine 100 % statique** (React 18 + Vite + TypeScript) pour un photographe fictif/à personnaliser ("Pixellia Photographie"), déployé sur GitHub Pages via GitHub Actions. Il n'existe **aucun backend, aucune base de données, aucun stockage d'images et aucun formulaire fonctionnel** : tout le contenu (portfolio, spécialités, témoignages, coordonnées) est codé en dur dans les composants React, et le formulaire de contact se contente d'un `alert()` de simulation.

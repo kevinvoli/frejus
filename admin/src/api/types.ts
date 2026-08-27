@@ -50,6 +50,20 @@ export interface SpecialtyPhoto {
   createdAt: string;
 }
 
+// Grille tarifaire d'une spécialité (un "sous-service" facturé séparément, voir
+// backend/src/specialties/entities/specialty-tariff.entity.ts) : prix en francs CFA,
+// `detail` est un champ texte libre pour la quantité/les conditions ("4 photos",
+// "1 personne, 4 photos"...).
+export interface SpecialtyTariff {
+  id: number;
+  specialtyId: number;
+  name: string;
+  price: number;
+  detail: string | null;
+  order: number;
+  createdAt: string;
+}
+
 export interface Specialty {
   id: number;
   title: string;
@@ -57,6 +71,7 @@ export interface Specialty {
   imageUrl: string | null;
   order: number;
   photos: SpecialtyPhoto[];
+  tariffs: SpecialtyTariff[];
   createdAt: string;
   updatedAt: string;
 }

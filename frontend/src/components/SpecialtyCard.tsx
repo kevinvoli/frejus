@@ -5,9 +5,10 @@ interface SpecialtyCardProps {
   description: string;
   imageUrl?: string;
   fallbackColor: string;
-  // Présent uniquement si la spécialité a un catalogue de photos (voir
-  // Specialties.tsx) : la carte devient alors cliquable et ouvre la galerie.
-  onOpenCatalog?: () => void;
+  // Présent uniquement si la spécialité a du contenu à montrer (photos de catalogue
+  // et/ou tarifs, voir Specialties.tsx) : la carte devient alors cliquable et envoie
+  // vers la page dédiée de la spécialité (galerie façon Pinterest + tarifs).
+  onOpen?: () => void;
 }
 
 const SpecialtyCard: React.FC<SpecialtyCardProps> = ({
@@ -15,14 +16,14 @@ const SpecialtyCard: React.FC<SpecialtyCardProps> = ({
   description,
   imageUrl,
   fallbackColor,
-  onOpenCatalog,
+  onOpen,
 }) => {
-  const clickable = Boolean(onOpenCatalog);
+  const clickable = Boolean(onOpen);
 
   return (
     <div
       className={clickable ? 'specialty-card specialty-card-clickable' : 'specialty-card'}
-      onClick={onOpenCatalog}
+      onClick={onOpen}
       role={clickable ? 'button' : undefined}
       tabIndex={clickable ? 0 : undefined}
       onKeyDown={
@@ -30,7 +31,7 @@ const SpecialtyCard: React.FC<SpecialtyCardProps> = ({
           ? (event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
-                onOpenCatalog?.();
+                onOpen?.();
               }
             }
           : undefined
@@ -38,7 +39,7 @@ const SpecialtyCard: React.FC<SpecialtyCardProps> = ({
     >
       <div className="specialty-image" style={imageUrl ? undefined : { backgroundColor: fallbackColor }}>
         {imageUrl && <img src={imageUrl} alt={title} />}
-        {clickable && <span className="specialty-catalog-badge">Voir la galerie</span>}
+        {clickable && <span className="specialty-catalog-badge">Voir les tarifs & la galerie</span>}
       </div>
       <div className="specialty-content">
         <h3>{title}</h3>

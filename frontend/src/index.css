@@ -291,6 +291,121 @@ nav a:hover {
     transform: translateY(0);
 }
 
+/* PAGE DÉDIÉE D'UNE SPÉCIALITÉ (voir SpecialtyDetail.tsx) : galerie façon Pinterest
+   + grille tarifaire, ouverte au clic sur une carte de spécialité. Réutilise le look
+   de la médiathèque cliente (.gallery-header/.gallery-main, voir plus bas). */
+.specialty-detail {
+    min-height: 100vh;
+    background-color: var(--gris-clair);
+}
+
+.specialty-detail-intro {
+    text-align: center;
+    margin-bottom: 50px;
+}
+
+.specialty-detail-intro h1 {
+    color: var(--noir);
+    font-size: 2.2rem;
+    margin-bottom: 10px;
+}
+
+.specialty-detail-intro p {
+    max-width: 640px;
+    margin: 0 auto;
+    color: var(--texte);
+}
+
+/* Grille tarifaire */
+.specialty-tariffs {
+    margin-bottom: 60px;
+}
+
+.specialty-tariffs h2,
+.specialty-masonry-title {
+    text-align: center;
+    color: var(--noir);
+    font-size: 1.6rem;
+    margin-bottom: 25px;
+}
+
+.specialty-tariffs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+}
+
+.tariff-card {
+    background-color: var(--blanc);
+    border-radius: 5px;
+    padding: 25px 20px;
+    text-align: center;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+}
+
+.tariff-card h3 {
+    color: var(--noir);
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+}
+
+.tariff-price {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 1.3rem;
+    margin-bottom: 6px;
+}
+
+.tariff-detail {
+    color: #777;
+    font-size: 0.9rem;
+}
+
+/* Galerie façon Pinterest : mise en colonnes CSS (masonry léger, sans dépendance) —
+   chaque photo garde son ratio d'origine plutôt que d'être recadrée en carré. */
+.specialty-masonry {
+    column-count: 2;
+    column-gap: 16px;
+}
+
+.specialty-masonry-item {
+    display: block;
+    width: 100%;
+    break-inside: avoid;
+    margin-bottom: 16px;
+    padding: 0;
+    border: none;
+    border-radius: 5px;
+    overflow: hidden;
+    background: none;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+}
+
+.specialty-masonry-item img {
+    display: block;
+    width: 100%;
+    height: auto;
+    transition: transform 0.3s;
+}
+
+.specialty-masonry-item:hover img,
+.specialty-masonry-item:focus-visible img {
+    transform: scale(1.03);
+}
+
+@media (min-width: 640px) {
+    .specialty-masonry {
+        column-count: 3;
+    }
+}
+
+@media (min-width: 1000px) {
+    .specialty-masonry {
+        column-count: 4;
+    }
+}
+
 /* LIGHTBOX (galerie plein écran du catalogue d'une spécialité) */
 .lightbox-overlay {
     position: fixed;

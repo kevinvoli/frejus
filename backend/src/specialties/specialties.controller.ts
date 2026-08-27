@@ -22,6 +22,8 @@ import { assertUploadAllowed } from '../common/disk-usage';
 import { SpecialtiesService } from './specialties.service';
 import { CreateSpecialtyDto } from './dto/create-specialty.dto';
 import { UpdateSpecialtyDto } from './dto/update-specialty.dto';
+import { CreateSpecialtyTariffDto } from './dto/create-specialty-tariff.dto';
+import { UpdateSpecialtyTariffDto } from './dto/update-specialty-tariff.dto';
 
 const PHOTOS_UPLOAD_DIR = './uploads/specialties';
 
@@ -123,5 +125,38 @@ export class SpecialtiesController {
     @Param('photoId', ParseIntPipe) photoId: number,
   ) {
     return this.service.removePhoto(id, photoId);
+  }
+
+  // --- Grille tarifaire (voir docs/ANALYSE-PLAN-BACKEND.md, ajout du 27/08) : les
+  // sous-services facturables d'une spécialité (ex. "Shooting individuel" à 15 000 F,
+  // "1 personne, 4 photos"). Lecture publique via findOne ci-dessus (renvoyée dans
+  // `tariffs`) ; écriture réservée au panneau admin, comme le reste de cette ressource.
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/tariffs')
+  addTariff(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreateSpecialtyTariffDto,
+  ) {
+    return this.service.addTariff(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put(':id/tariffs/:tariffId')
+  updateTariff(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('tariffId', ParseIntPipe) tariffId: number,
+    @Body() dto: UpdateSpecialtyTariffDto,
+  ) {
+    return this.service.updateTariff(id, tariffId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/tariffs/:tariffId')
+  removeTariff(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('tariffId', ParseIntPipe) tariffId: number,
+  ) {
+    return this.service.removeTariff(id, tariffId);
   }
 }

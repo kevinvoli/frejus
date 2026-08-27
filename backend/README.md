@@ -60,6 +60,8 @@ Tous préfixés par `/api`. Les routes marquées 🔒 nécessitent un header
 | POST/PUT/DELETE 🔒 | `/specialties[/:id]` | CRUD spécialités |
 | POST 🔒 | `/specialties/:id/photos` | Ajout de photos au catalogue (`multipart/form-data`, champ `files`, jusqu'à 30 fichiers) |
 | DELETE 🔒 | `/specialties/:id/photos/:photoId` | Suppression d'une photo du catalogue |
+| POST 🔒 | `/specialties/:id/tariffs` | Ajout d'un tarif (sous-service facturé) à la grille tarifaire |
+| PUT/DELETE 🔒 | `/specialties/:id/tariffs/:tariffId` | Modification/suppression d'un tarif |
 | GET | `/portfolio?category=Portrait` | Portfolio publié, filtrable par catégorie |
 | GET 🔒 | `/portfolio/admin/all` | Portfolio complet (y compris non publié) |
 | POST/PUT/DELETE 🔒 | `/portfolio[/:id]` | CRUD portfolio |

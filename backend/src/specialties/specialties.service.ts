@@ -9,8 +9,11 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import { Specialty } from './entities/specialty.entity';
 import { SpecialtyPhoto } from './entities/specialty-photo.entity';
+import { SpecialtyTariff } from './entities/specialty-tariff.entity';
 import { CreateSpecialtyDto } from './dto/create-specialty.dto';
 import { UpdateSpecialtyDto } from './dto/update-specialty.dto';
+import { CreateSpecialtyTariffDto } from './dto/create-specialty-tariff.dto';
+import { UpdateSpecialtyTariffDto } from './dto/update-specialty-tariff.dto';
 import { StorageService } from '../storage/storage.service';
 
 @Injectable()
@@ -20,19 +23,22 @@ export class SpecialtiesService {
     private readonly repo: Repository<Specialty>,
     @InjectRepository(SpecialtyPhoto)
     private readonly photoRepo: Repository<SpecialtyPhoto>,
+    @InjectRepository(SpecialtyTariff)
+    private readonly tariffRepo: Repository<SpecialtyTariff>,
     private readonly storageService: StorageService,
   ) {}
 
-  // Le catalogue de photos est renvoyé trié pour le site vitrine (lightbox au clic
-  // sur la carte) comme pour le panneau admin — voir docs/ANALYSE-PLAN-BACKEND.md,
-  // ajout du 26/08.
+  // Le catalogue de photos et la grille tarifaire sont renvoyés triés pour le site
+  // vitrine (page dédiée de la spécialité) comme pour le panneau admin — voir
+  // docs/ANALYSE-PLAN-BACKEND.md, ajouts du 26/08 et du 27/08.
   async findAll(): Promise<Specialty[]> {
     const specialties = await this.repo.find({
       order: { order: 'ASC', id: 'ASC' },
-      relations: { photos: true },
+      relations: { photos: true, tariffs: true },
     });
     for (const specialty of specialties) {
       specialty.photos = this.sortPhotos(specialty.photos);
+      specialty.tariffs = this.sortTariffs(specialty.tariffs);
     }
     return specialties;
   }
@@ -40,12 +46,13 @@ export class SpecialtiesService {
   async findOne(id: number): Promise<Specialty> {
     const specialty = await this.repo.findOne({
       where: { id },
-      relations: { photos: true },
+      relations: { photos: true, tariffs: true },
     });
     if (!specialty) {
       throw new NotFoundException(`Spécialité ${id} introuvable`);
     }
     specialty.photos = this.sortPhotos(specialty.photos);
+    specialty.tariffs = this.sortTariffs(specialty.tariffs);
     return specialty;
   }
 
@@ -116,6 +123,62 @@ export class SpecialtiesService {
     }
     await this.deleteFileQuietly(photo.fileUrl);
     await this.photoRepo.remove(photo);
+  }
+
+  // --- Grille tarifaire (voir docs/ANALYSE-PLAN-BACKEND.md, ajout du 27/08) ---
+  // Pas de fichier associé à une ligne tarifaire : contrairement au catalogue de
+  // photos, ni le quota de stockage ni la suppression de fichier ne sont concernés
+  // ici — seulement des lignes en base, supprimées en cascade avec la spécialité
+  // (ON DELETE CASCADE sur specialty_tariffs, voir specialty-tariff.entity.ts).
+
+  async addTariff(
+    specialtyId: number,
+    dto: CreateSpecialtyTariffDto,
+  ): Promise<Specialty> {
+    await this.findOne(specialtyId); // 404 si la spécialité n'existe pas
+    await this.tariffRepo.save(this.tariffRepo.create({ ...dto, specialtyId }));
+    return this.findOne(specialtyId);
+  }
+
+  async updateTariff(
+    specialtyId: number,
+    tariffId: number,
+    dto: UpdateSpecialtyTariffDto,
+  ): Promise<Specialty> {
+    const tariff = await this.findOneTariff(specialtyId, tariffId);
+    await this.tariffRepo.save(this.tariffRepo.merge(tariff, dto));
+    return this.findOne(specialtyId);
+  }
+
+  async removeTariff(specialtyId: number, tariffId: number): Promise<void> {
+    const tariff = await this.findOneTariff(specialtyId, tariffId);
+    await this.tariffRepo.remove(tariff);
+  }
+
+  private async findOneTariff(
+    specialtyId: number,
+    tariffId: number,
+  ): Promise<SpecialtyTariff> {
+    const tariff = await this.tariffRepo.findOne({
+      where: { id: tariffId, specialtyId },
+    });
+    if (!tariff) {
+      throw new NotFoundException(
+        `Tarif ${tariffId} introuvable dans cette spécialité`,
+      );
+    }
+    return tariff;
+  }
+
+  private sortTariffs(
+    tariffs: SpecialtyTariff[] | undefined,
+  ): SpecialtyTariff[] {
+    return (tariffs ?? [])
+      .slice()
+      .sort(
+        (a, b) =>
+          a.order - b.order || a.createdAt.getTime() - b.createdAt.getTime(),
+      );
   }
 
   private sortPhotos(photos: SpecialtyPhoto[] | undefined): SpecialtyPhoto[] {

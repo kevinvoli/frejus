@@ -26,11 +26,23 @@ export interface SiteSettings {
 }
 
 // Catalogue de photos d'une spécialité : distinct de `imageUrl`, qui reste l'image de
-// premier plan affichée sur la carte. Le catalogue s'ouvre en galerie (lightbox) au
-// clic sur la carte, quand il contient au moins une photo.
+// premier plan affichée sur la carte. Le catalogue est affiché en grille façon
+// Pinterest sur la page dédiée de la spécialité, ouverte au clic sur la carte (voir
+// docs/ANALYSE-PLAN-BACKEND.md, ajout du 27/08).
 export interface SpecialtyPhoto {
   id: number;
   fileUrl: string;
+  order: number;
+}
+
+// Une ligne de la grille tarifaire d'une spécialité (un "sous-service" facturé
+// séparément, ex. "Shooting individuel" à 15 000 F CFA). `detail` est un champ texte
+// libre pour la quantité/les conditions ("4 photos", "1 personne, 4 photos"...).
+export interface SpecialtyTariff {
+  id: number;
+  name: string;
+  price: number;
+  detail: string | null;
   order: number;
 }
 
@@ -41,6 +53,7 @@ export interface Specialty {
   imageUrl: string | null;
   order: number;
   photos: SpecialtyPhoto[];
+  tariffs: SpecialtyTariff[];
 }
 
 export interface PortfolioItem {

@@ -31,6 +31,7 @@ export const DEFAULT_SPECIALTIES: Specialty[] = [
     imageUrl: null,
     order: 0,
     photos: [],
+    tariffs: [],
   },
   {
     id: -2,
@@ -39,6 +40,7 @@ export const DEFAULT_SPECIALTIES: Specialty[] = [
     imageUrl: null,
     order: 1,
     photos: [],
+    tariffs: [],
   },
   {
     id: -3,
@@ -47,6 +49,7 @@ export const DEFAULT_SPECIALTIES: Specialty[] = [
     imageUrl: null,
     order: 2,
     photos: [],
+    tariffs: [],
   },
 ];
 
