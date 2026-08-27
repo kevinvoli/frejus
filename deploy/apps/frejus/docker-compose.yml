@@ -15,72 +15,87 @@
 # Le réseau "frejus" est externe et créé par le pipeline au premier déploiement :
 #   docker network create frejus
 
+
 name: frejus
 
 services:
+
   web:
     image: ${FRONTEND_IMAGE:-ghcr.io/kevinvoli/frejus-frontend:latest}
     container_name: frejus-web
     restart: unless-stopped
+
     ports:
-      - '127.0.0.1:3000:80'
+      - "127.0.0.1:3000:80"
+
     networks:
       - frejus
+
     logging:
       driver: json-file
       options:
-        max-size: '10m'
-        max-file: '3'
+        max-size: "10m"
+        max-file: "3"
+
 
   api:
     image: ${BACKEND_IMAGE:-ghcr.io/kevinvoli/frejus-backend:latest}
     container_name: frejus-api
     restart: unless-stopped
+
     env_file:
       - .env
+
     environment:
-      # Le conteneur écoute sur 3000 (défaut de l'app, identique au dev local) ;
-      # c'est la publication ci-dessous qui expose l'API sur le 4000 de l'hôte.
       PORT: 3000
+
     ports:
-      - '127.0.0.1:4000:3000'
+      - "127.0.0.1:4000:3000"
+
     volumes:
-      # Images uploadées (portfolio, spécialités, galeries) — bind mount pour que
-      # les sauvegardes se fassent simplement depuis l'hôte.
       - ./data/uploads:/app/uploads
+
     networks:
       - frejus
       - database
+
     logging:
       driver: json-file
       options:
-        max-size: '10m'
-        max-file: '3'
+        max-size: "10m"
+        max-file: "3"
+
 
   admin:
     image: ${ADMIN_IMAGE:-ghcr.io/kevinvoli/frejus-admin:latest}
     container_name: frejus-admin
     restart: unless-stopped
+
     depends_on:
       - api
+
     ports:
-      - '127.0.0.1:3001:80'
+      - "127.0.0.1:3001:80"
+
     networks:
       - frejus
+
     logging:
       driver: json-file
       options:
-        max-size: '10m'
-        max-file: '3'
+        max-size: "10m"
+        max-file: "3"
+
 
 networks:
-  # Réseau privé des trois services du projet.
+
+  # Réseau privé de l'application.
+  # web <-> api <-> admin
   frejus:
     external: true
 
-  # Réseau par lequel l'API joint la base de données. Externe et nommé depuis le .env :
-  # il appartient à l'administrateur de MySQL, pas à ce fichier. Voir .env.example pour
-  # le couple DB_NETWORK / DB_HOST selon la façon dont la base est hébergée.
+  # Réseau permettant uniquement à l'API de joindre MySQL.
+  # Le réseau "backend" existe déjà sur le VPS.
   database:
     external: true
-    name: ${DB_NETWORK:-bridge}
+    name: backend
