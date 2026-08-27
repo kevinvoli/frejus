@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import './index.css';
-import { apiGet } from './api/client';
+import { apiGet, assetUrl } from './api/client';
 import type { SiteSettings } from './api/types';
 import { DEFAULT_SETTINGS } from './defaultContent';
 import Header from './components/Header';
@@ -13,6 +13,7 @@ import Contact from './components/Contact';
 import Footer from './components/Footer';
 import GalleryView from './components/GalleryView';
 import SpecialtyDetail from './components/SpecialtyDetail';
+import LegalPage, { isLegalSlug, type LegalSlug } from './components/LegalPage';
 
 // Lit un entier positif depuis un paramètre de requête, ou null si absent/invalide —
 // utilisé pour ?specialite=<id> ci-dessous (voir handleOpenSpecialty).
@@ -20,6 +21,26 @@ function readIdParam(name: string): number | null {
   const raw = new URLSearchParams(window.location.search).get(name);
   const id = raw ? Number(raw) : NaN;
   return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+// Hauteur du header fixe (voir .hero { margin-top: 70px } dans index.css) : à
+// déduire pour qu'une section ciblée par une ancre ne se retrouve pas cachée dessous.
+const FIXED_HEADER_HEIGHT = 70;
+
+// Défile jusqu'à la section ciblée par le hash de l'URL (ex. "#portfolio"), avec un
+// léger différé pour laisser le temps au premier rendu de peindre les sections. Sert
+// de filet de sécurité au comportement natif du navigateur : les liens du menu (voir
+// Header.tsx) pointent vers "/#ancre" pour fonctionner aussi depuis les autres pages
+// du site (médiathèque, page dédiée d'une spécialité) — depuis ces pages, changer de
+// page ET défiler jusqu'à l'ancre en une seule navigation n'est pas toujours fiable
+// selon le navigateur.
+function scrollToHash() {
+  const hash = window.location.hash.slice(1);
+  if (!hash) return;
+  const target = document.getElementById(hash);
+  if (!target) return;
+  const top = target.getBoundingClientRect().top + window.scrollY - FIXED_HEADER_HEIGHT;
+  window.scrollTo({ top, behavior: 'smooth' });
 }
 
 const App: React.FC = () => {
@@ -37,6 +58,14 @@ const App: React.FC = () => {
   // d'URL /?specialite=<id> plutôt qu'un routeur dédié pour ce site vitrine.
   const [specialtyId, setSpecialtyId] = useState<number | null>(() => readIdParam('specialite'));
 
+  // Pages légales (Mentions légales, Politique de confidentialité, Conditions
+  // générales — voir LegalPage.tsx et Footer.tsx) : même principe, un paramètre
+  // /?page=<slug> plutôt qu'un routeur dédié.
+  const [legalSlug, setLegalSlug] = useState<LegalSlug | null>(() => {
+    const raw = new URLSearchParams(window.location.search).get('page');
+    return isLegalSlug(raw) ? raw : null;
+  });
+
   function handleOpenGallery(code: string) {
     // Nettoyage : le client peut taper le code avec des espaces/tirets/minuscules
     // (voir la mise en forme "XXXX-XXXX" affichée dans l'admin) — le backend
@@ -53,9 +82,10 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   }
 
-  function handleCloseSpecialty() {
-    window.history.pushState(null, '', '/');
-    setSpecialtyId(null);
+  function handleOpenLegal(slug: LegalSlug) {
+    window.history.pushState(null, '', `?page=${slug}`);
+    setLegalSlug(slug);
+    window.scrollTo(0, 0);
   }
 
   // Réglages du site (accroche, à propos, coordonnées...) chargés une seule fois ici
@@ -66,7 +96,10 @@ const App: React.FC = () => {
   const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
-    if (galleryToken || specialtyId) return; // Pages dédiées : les réglages du site ne sont pas utilisés.
+    // Chargé sur toutes les pages, y compris les pages dédiées (médiathèque, page
+    // d'une spécialité, pages légales) : ces pages n'utilisent pas `settings` pour
+    // leur propre contenu, mais le favicon (voir l'effet ci-dessous) doit s'afficher
+    // partout, y compris sur un lien direct vers l'une de ces pages.
     let cancelled = false;
     apiGet<SiteSettings>('/settings')
       .then((data) => {
@@ -82,12 +115,41 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Icône affichée dans l'onglet du navigateur (voir GeneralSettingsForm.tsx côté
+  // panneau admin) : index.html est un fichier statique, donc injectée ici plutôt
+  // qu'au moment du build. Ne fait rien tant qu'aucun favicon n'est renseigné (garde
+  // l'icône par défaut du navigateur/Vite).
+  useEffect(() => {
+    const href = assetUrl(settings.faviconUrl);
+    if (!href) return;
+    let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.href = href;
+  }, [settings.faviconUrl]);
+
+  useEffect(() => {
+    if (galleryToken || specialtyId || legalSlug) return;
+    // Défilement différé à la frame suivante : laisse le premier rendu peindre les
+    // sections avant de mesurer leur position (voir scrollToHash ci-dessus).
+    const raf = requestAnimationFrame(scrollToHash);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (galleryToken) {
-    return <GalleryView token={galleryToken} />;
+    return <GalleryView token={galleryToken} onOpenGallery={handleOpenGallery} />;
   }
 
   if (specialtyId) {
-    return <SpecialtyDetail id={specialtyId} onBack={handleCloseSpecialty} />;
+    return <SpecialtyDetail id={specialtyId} onOpenGallery={handleOpenGallery} />;
+  }
+
+  if (legalSlug) {
+    return <LegalPage slug={legalSlug} onOpenGallery={handleOpenGallery} />;
   }
 
   return (
@@ -101,7 +163,7 @@ const App: React.FC = () => {
         <Testimonials />
         <Contact settings={settings} />
       </main>
-      <Footer settings={settings} />
+      <Footer settings={settings} onOpenLegal={handleOpenLegal} />
     </div>
   );
 };

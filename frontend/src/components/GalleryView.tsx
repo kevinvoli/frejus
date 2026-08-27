@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from 'react';
+import Header from './Header';
 import { apiGet, apiPost, apiUrl, assetUrl } from '../api/client';
 import { MediaType, type GalleryAccessResponse, type GalleryUnlocked } from '../api/types';
 
 interface GalleryViewProps {
   token: string;
+  // Pour afficher la barre de navigation complète (voir Header.tsx) même sur cette
+  // page — elle ne doit jamais disparaître en changeant de page.
+  onOpenGallery: (code: string) => void;
 }
 
 // Page cliente de la médiathèque : accessible via /?galerie=<token>, sans compte ni
@@ -42,7 +46,7 @@ function storeUsageToken(token: string, usageToken: string): void {
 
 const MAX_USES_ERROR_PATTERN = /nombre maximal d'utilisations/i;
 
-const GalleryView: React.FC<GalleryViewProps> = ({ token }) => {
+const GalleryView: React.FC<GalleryViewProps> = ({ token, onOpenGallery }) => {
   const [state, setState] = useState<ViewState>('loading');
   const [gallery, setGallery] = useState<GalleryUnlocked | null>(null);
   const [password, setPassword] = useState('');
@@ -104,13 +108,7 @@ const GalleryView: React.FC<GalleryViewProps> = ({ token }) => {
 
   return (
     <div className="gallery-view">
-      <header className="gallery-header">
-        <div className="container gallery-header-content">
-          <a href="/" className="logo">
-            Pixellia Photographie
-          </a>
-        </div>
-      </header>
+      <Header onOpenGallery={onOpenGallery} />
 
       <main className="gallery-main container">
         {state === 'loading' && <p className="gallery-status">Chargement de la galerie...</p>}

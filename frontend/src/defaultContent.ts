@@ -20,6 +20,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   instagramUrl: null,
   facebookUrl: null,
   pinterestUrl: null,
+  faviconUrl: null,
+  logoUrl: null,
 };
 
 export const DEFAULT_SPECIALTIES: Specialty[] = [

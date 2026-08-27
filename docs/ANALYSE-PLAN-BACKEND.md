@@ -574,6 +574,86 @@ s'affichent correctement, le clic sur une photo l'agrandit en plein écran avec 
 précédent/suivant, et le lien du logo ramène bien à la page d'accueil (URL nettoyée du paramètre
 `?specialite=`).
 
+## Mise à jour du 27 août 2026 (suite) — correctif : barre de navigation absente sur les pages dédiées
+
+Signalé par le client : la barre de navigation complète (avec tous ses liens) disparaissait en
+changeant de page — remplacée par un en-tête minimal (juste le logo) sur la médiathèque cliente
+et sur la nouvelle page dédiée d'une spécialité.
+
+- **Cause** : `GalleryView.tsx` et `SpecialtyDetail.tsx` affichaient chacun leur propre en-tête
+  minimal plutôt que le composant `Header.tsx` du site, dont les liens de menu pointaient en plus
+  vers de simples ancres (`#portfolio`...) qui n'existent que sur la page d'accueil.
+- **Correctif** : les deux pages affichent maintenant le vrai `Header.tsx` (mêmes liens, même
+  bouton "Récupérer mes photos"). Ses liens de menu pointent désormais vers des chemins absolus
+  (`/#portfolio` au lieu de `#portfolio`) : cliqués depuis l'accueil, ils défilent en douceur comme
+  avant ; cliqués depuis une autre page, ils ramènent d'abord à l'accueil puis défilent jusqu'à la
+  bonne section (avec un filet de sécurité JS en complément du comportement natif du navigateur,
+  pas toujours fiable seul pour ce cas de figure). Le bouton "retour" dédié de la page spécialité
+  (état React, sans rechargement) a été retiré au passage : le logo du menu ramène maintenant à
+  l'accueil de la même façon sur les trois pages du site, plus cohérent qu'avant.
+
+**Vérification effectuée** : build frontend sans erreur. Testé en navigateur (Playwright) : les 5
+liens du menu et le bouton "Récupérer mes photos" sont bien visibles sur la page d'une spécialité
+et sur la médiathèque cliente ; cliquer sur "Portfolio" depuis la page d'une spécialité ramène bien
+à l'accueil avec la section Portfolio correctement positionnée sous la barre de navigation (fixe).
+
+## Mise à jour du 27 août 2026 (suite) — panneau admin : icône du site, logo et pages légales
+
+Demande client : donner la possibilité à l'admin d'ajouter l'icône du site (favicon) "et
+autre", et de rédiger le contenu des 3 pages légales (Mentions légales, Politique de
+confidentialité, Conditions générales), jusqu'ici de simples liens `#` en pied de page.
+
+- **Backend** — deux nouvelles sections de réglages, sur le même principe qu'une table dédiée par
+  section (voir la refonte du panneau admin du 26/08) :
+  - `GeneralSettings` (`general_settings`, voir
+    `backend/src/settings/entities/general-settings.entity.ts`) : `faviconUrl` (icône affichée
+    dans l'onglet du navigateur) et `logoUrl` (logo affiché en pied de page à la place du texte
+    "Pixellia" tant qu'aucun logo n'est renseigné) — c'est l'interprétation retenue pour "l'icône
+    du site et autre", faute de précision supplémentaire du client sur la portée exacte de "et
+    autre". Routes `GET/PUT /settings/general`, protégées JWT comme les autres sections.
+  - `LegalSettings` (`legal_settings`, voir
+    `backend/src/settings/entities/legal-settings.entity.ts`) : un champ texte par page
+    (`mentionsLegales`, `politiqueConfidentialite`, `conditionsGenerales`) — une seule table
+    plutôt qu'une entité par page, ces 3 blocs de texte n'ayant besoin d'aucune structure propre
+    (pas de liste, pas de tri, pas de statut publié/brouillon). Route `GET /settings/legal`
+    exceptionnellement **publique** (contrairement aux autres sections) puisqu'elle est aussi
+    consommée directement par les 3 pages légales du site vitrine, pas seulement par le
+    formulaire du panneau admin ; `PUT /settings/legal` reste protégée JWT.
+  - L'agrégat public `GET /settings` (consommé par le site vitrine) inclut désormais `faviconUrl`
+    et `logoUrl`, pour que le favicon puisse être affiché dès le premier chargement de n'importe
+    quelle page du site.
+- **Panneau admin** — deux nouveaux onglets dans "Réglages du site" (`SettingsPage.tsx`) :
+  "Général" (upload du favicon et du logo, via le composant `ImageUploadField` déjà utilisé
+  ailleurs) et "Pages légales" (une zone de texte par page, même principe que le texte "à propos").
+- **Site vitrine** :
+  - Le favicon est injecté dynamiquement dans `<head>` (`App.tsx`, effet sur
+    `settings.faviconUrl`) puisque `index.html` est un fichier statique généré au build — il
+    s'affiche donc sur toutes les pages du site, y compris en arrivant directement sur la
+    médiathèque, la page d'une spécialité ou une page légale par un lien partagé (le chargement de
+    `GET /settings` n'est donc plus limité à la page d'accueil).
+  - Le logo, quand il est renseigné, remplace le texte "Pixellia" en pied de page (`Footer.tsx`).
+  - Nouvelle page dédiée par page légale, accessible via `/?page=<slug>` (mêmes principes que la
+    médiathèque `/?galerie=` et la page de spécialité `/?specialite=` : pas de routeur dédié pour
+    ce site, et la barre de navigation complète du site, `Header.tsx`, y est affichée comme sur les
+    deux autres pages dédiées — voir le correctif du 27/08 sur la barre de navigation). Message
+    d'attente affiché tant que le contenu n'a pas encore été saisi côté admin plutôt qu'une page
+    d'erreur.
+  - Les 3 liens "Legal" du pied de page (`Footer.tsx`) pointent maintenant vers ces pages au lieu
+    de `href="#"` : navigation interne sans rechargement au clic simple, tout en restant des liens
+    `/?page=...` valides individuellement (ouverture dans un nouvel onglet, partage direct).
+
+**Ce qui n'a pas été traité** : la colonne "Services" du pied de page (Portrait, Mariage,
+Paysage, Événements, Studio) contient elle aussi 5 liens `href="#"`, mais n'a pas été mentionnée
+dans la demande — laissée telle quelle.
+
+**Vérification effectuée** : build backend + admin + frontend sans erreur (lint backend/admin
+également, sans nouvel avertissement). Testé en navigateur (Playwright) : upload d'un favicon et
+d'un logo depuis le panneau admin, persistant après rechargement de la page ; favicon visible dans
+l'onglet du navigateur sur le site vitrine, y compris en arrivant directement sur une page légale
+par son URL ; logo affiché en pied de page à la place du texte "Pixellia" ; les 3 pages légales
+remplies depuis l'admin puis vérifiées sur le site vitrine (contenu affiché correctement, barre de
+navigation complète présente) ; clic sur chacun des 3 liens "Legal" du pied de page vérifié.
+
 ## 1. Résumé
 
 Le projet `frejus` est actuellement un **site vitrine 100 % statique** (React 18 + Vite + TypeScript) pour un photographe fictif/à personnaliser ("Pixellia Photographie"), déployé sur GitHub Pages via GitHub Actions. Il n'existe **aucun backend, aucune base de données, aucun stockage d'images et aucun formulaire fonctionnel** : tout le contenu (portfolio, spécialités, témoignages, coordonnées) est codé en dur dans les composants React, et le formulaire de contact se contente d'un `alert()` de simulation.

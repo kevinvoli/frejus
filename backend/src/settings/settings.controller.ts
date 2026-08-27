@@ -5,6 +5,8 @@ import { UpdateHeroSettingsDto } from './dto/update-hero-settings.dto';
 import { UpdateAboutSettingsDto } from './dto/update-about-settings.dto';
 import { UpdateContactSettingsDto } from './dto/update-contact-settings.dto';
 import { UpdateSocialSettingsDto } from './dto/update-social-settings.dto';
+import { UpdateGeneralSettingsDto } from './dto/update-general-settings.dto';
+import { UpdateLegalSettingsDto } from './dto/update-legal-settings.dto';
 
 @Controller('settings')
 export class SettingsController {
@@ -67,5 +69,32 @@ export class SettingsController {
   @Put('social')
   updateSocial(@Body() dto: UpdateSocialSettingsDto) {
     return this.settingsService.updateSocial(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('general')
+  getGeneral() {
+    return this.settingsService.getGeneral();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('general')
+  updateGeneral(@Body() dto: UpdateGeneralSettingsDto) {
+    return this.settingsService.updateGeneral(dto);
+  }
+
+  // Section "Pages légales" : la lecture (GET) est publique — contrairement aux
+  // autres sections — puisqu'elle est aussi utilisée directement par les 3 pages
+  // légales du site vitrine (voir LegalPage.tsx), pas seulement par le formulaire du
+  // panneau admin. La modification (PUT) reste protégée comme les autres sections.
+  @Get('legal')
+  getLegal() {
+    return this.settingsService.getLegal();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('legal')
+  updateLegal(@Body() dto: UpdateLegalSettingsDto) {
+    return this.settingsService.updateLegal(dto);
   }
 }

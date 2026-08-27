@@ -22,14 +22,21 @@ const Header: React.FC<HeaderProps> = ({ onOpenGallery }) => {
     <header>
       <div className="container">
         <div className="header-content">
-          <a href="#" className="logo">Pixellia</a>
+          {/* Chemin absolu (pas juste "#...") : ces liens doivent aussi fonctionner
+              depuis les autres pages du site (médiathèque, page dédiée d'une
+              spécialité, voir GalleryView.tsx / SpecialtyDetail.tsx), où les sections
+              ciblées n'existent pas dans le DOM. Un chemin absolu ramène d'abord à
+              l'accueil (navigation complète, la page/requête diffère) puis le
+              navigateur défile jusqu'à l'ancre ; depuis l'accueil lui-même, seul le
+              hash change donc ça reste un simple défilement en douceur. */}
+          <a href="/" className="logo">Pixellia</a>
           <nav>
             <ul>
-              <li><a href="#accueil">Accueil</a></li>
-              <li><a href="#apropos">À propos</a></li>
-              <li><a href="#portfolio">Portfolio</a></li>
-              <li><a href="#services">Services</a></li>
-              <li><a href="#contact">Contact</a></li>
+              <li><a href="/#accueil">Accueil</a></li>
+              <li><a href="/#apropos">À propos</a></li>
+              <li><a href="/#portfolio">Portfolio</a></li>
+              <li><a href="/#services">Services</a></li>
+              <li><a href="/#contact">Contact</a></li>
               <li className="gallery-code-nav-item">
                 <button
                   type="button"

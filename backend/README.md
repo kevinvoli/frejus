@@ -51,11 +51,13 @@ Tous préfixés par `/api`. Les routes marquées 🔒 nécessitent un header
 | Méthode | Route | Description |
 |---|---|---|
 | POST | `/auth/login` | Connexion admin, retourne un JWT |
-| GET | `/settings` | Contenu éditable du site, agrégé depuis les 4 tables ci-dessous (public, consommé par le site vitrine) |
+| GET | `/settings` | Contenu éditable du site, agrégé depuis les tables ci-dessous (public, consommé par le site vitrine) — inclut `faviconUrl`/`logoUrl` de la section Général, mais pas les pages légales (voir `/settings/legal`) |
 | GET/PUT 🔒 | `/settings/hero` | Section Accueil (titre d'accroche, sous-titre, image) |
 | GET/PUT 🔒 | `/settings/about` | Section À propos (texte, photo) |
 | GET/PUT 🔒 | `/settings/contact` | Section Studio et contact (nom, adresse, ville, téléphone, email, horaires) |
 | GET/PUT 🔒 | `/settings/social` | Section Réseaux sociaux (Instagram, Facebook, Pinterest) |
+| GET/PUT 🔒 | `/settings/general` | Section Général (favicon, logo) |
+| GET 🔓 / PUT 🔒 | `/settings/legal` | Pages légales (Mentions légales, Politique de confidentialité, Conditions générales) — lecture publique (consommée directement par le site vitrine), écriture protégée |
 | GET | `/specialties` | Liste des spécialités (chacune avec son tableau `photos` de catalogue) |
 | POST/PUT/DELETE 🔒 | `/specialties[/:id]` | CRUD spécialités |
 | POST 🔒 | `/specialties/:id/photos` | Ajout de photos au catalogue (`multipart/form-data`, champ `files`, jusqu'à 30 fichiers) |

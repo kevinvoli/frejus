@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
+import Header from './Header';
 import Lightbox from './Lightbox';
 import { apiGet, assetUrl } from '../api/client';
 import type { Specialty } from '../api/types';
 
 interface SpecialtyDetailProps {
   id: number;
-  // Retour au site vitrine (gère l'URL et l'état, voir App.tsx) — pas de routeur
-  // dédié pour ce site, même principe que GalleryView.tsx pour la médiathèque.
-  onBack: () => void;
+  // Pour afficher la barre de navigation complète (voir Header.tsx) même sur cette
+  // page — elle ne doit jamais disparaître en changeant de page. Le retour au site
+  // vitrine se fait via le logo du menu (lien "/", même principe que
+  // GalleryView.tsx pour la médiathèque — pas de routeur dédié pour ce site).
+  onOpenGallery: (code: string) => void;
 }
 
 type ViewState = 'loading' | 'found' | 'not-found';
@@ -23,7 +26,7 @@ function formatPrice(price: number): string {
 // sous-services de cette spécialité, gérée depuis le panneau admin (voir
 // docs/ANALYSE-PLAN-BACKEND.md, ajout du 27/08). Sans routeur dédié, comme
 // GalleryView.tsx : accessible via /?specialite=<id>.
-const SpecialtyDetail: React.FC<SpecialtyDetailProps> = ({ id, onBack }) => {
+const SpecialtyDetail: React.FC<SpecialtyDetailProps> = ({ id, onOpenGallery }) => {
   const [state, setState] = useState<ViewState>('loading');
   const [specialty, setSpecialty] = useState<Specialty | null>(null);
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
@@ -52,20 +55,7 @@ const SpecialtyDetail: React.FC<SpecialtyDetailProps> = ({ id, onBack }) => {
 
   return (
     <div className="specialty-detail">
-      <header className="gallery-header">
-        <div className="container gallery-header-content">
-          <a
-            href="/"
-            className="logo"
-            onClick={(event) => {
-              event.preventDefault();
-              onBack();
-            }}
-          >
-            Pixellia Photographie
-          </a>
-        </div>
-      </header>
+      <Header onOpenGallery={onOpenGallery} />
 
       <main className="gallery-main container">
         {state === 'loading' && <p className="gallery-status">Chargement...</p>}

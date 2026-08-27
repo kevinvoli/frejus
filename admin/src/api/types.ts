@@ -40,6 +40,26 @@ export interface SocialSettings {
   updatedAt: string;
 }
 
+// Identité visuelle globale : favicon (onglet du navigateur) et logo (pied de page du
+// site vitrine, à la place du texte "Pixellia" tant qu'aucun logo n'est renseigné).
+export interface GeneralSettings {
+  id: number;
+  faviconUrl: string | null;
+  logoUrl: string | null;
+  updatedAt: string;
+}
+
+// Contenu des 3 pages légales du site vitrine (voir Footer.tsx côté site vitrine).
+// Lecture publique côté backend (contrairement aux autres sections) puisque ces pages
+// sont aussi consommées directement par le site vitrine.
+export interface LegalSettings {
+  id: number;
+  mentionsLegales: string | null;
+  politiqueConfidentialite: string | null;
+  conditionsGenerales: string | null;
+  updatedAt: string;
+}
+
 // Catalogue de photos d'une spécialité (voir backend/src/specialties) : distinct de
 // `imageUrl` sur Specialty, qui reste l'image de premier plan affichée sur la carte.
 export interface SpecialtyPhoto {

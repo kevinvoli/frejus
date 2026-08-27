@@ -10,10 +10,14 @@ import { HeroSettings } from './entities/hero-settings.entity';
 import { AboutSettings } from './entities/about-settings.entity';
 import { ContactSettings } from './entities/contact-settings.entity';
 import { SocialSettings } from './entities/social-settings.entity';
+import { GeneralSettings } from './entities/general-settings.entity';
+import { LegalSettings } from './entities/legal-settings.entity';
 import { UpdateHeroSettingsDto } from './dto/update-hero-settings.dto';
 import { UpdateAboutSettingsDto } from './dto/update-about-settings.dto';
 import { UpdateContactSettingsDto } from './dto/update-contact-settings.dto';
 import { UpdateSocialSettingsDto } from './dto/update-social-settings.dto';
+import { UpdateGeneralSettingsDto } from './dto/update-general-settings.dto';
+import { UpdateLegalSettingsDto } from './dto/update-legal-settings.dto';
 
 const SETTINGS_ID = 1;
 
@@ -40,6 +44,10 @@ export class SettingsService {
     private readonly contactRepo: Repository<ContactSettings>,
     @InjectRepository(SocialSettings)
     private readonly socialRepo: Repository<SocialSettings>,
+    @InjectRepository(GeneralSettings)
+    private readonly generalRepo: Repository<GeneralSettings>,
+    @InjectRepository(LegalSettings)
+    private readonly legalRepo: Repository<LegalSettings>,
   ) {}
 
   // Crée la ligne unique (id fixe) d'une section si elle n'existe pas encore, sans
@@ -119,6 +127,31 @@ export class SettingsService {
     return this.socialRepo.save(this.socialRepo.merge(current, dto));
   }
 
+  // --- Section "Général" (favicon, logo) ---
+
+  async getGeneral(): Promise<GeneralSettings> {
+    return this.getOrCreateSingleton(this.generalRepo, {});
+  }
+
+  async updateGeneral(dto: UpdateGeneralSettingsDto): Promise<GeneralSettings> {
+    const current = await this.getGeneral();
+    return this.generalRepo.save(this.generalRepo.merge(current, dto));
+  }
+
+  // --- Section "Pages légales" ---
+
+  // Publique (voir settings.controller.ts) : consommée à la fois par le formulaire
+  // admin et par les 3 pages légales du site vitrine (voir LegalPage.tsx) — seule la
+  // modification (PUT) est protégée.
+  async getLegal(): Promise<LegalSettings> {
+    return this.getOrCreateSingleton(this.legalRepo, {});
+  }
+
+  async updateLegal(dto: UpdateLegalSettingsDto): Promise<LegalSettings> {
+    const current = await this.getLegal();
+    return this.legalRepo.save(this.legalRepo.merge(current, dto));
+  }
+
   // --- Agrégat public (site vitrine) ---
 
   // Fusionne les 4 sections dans la même forme plate qu'avant la refonte du panneau
@@ -140,12 +173,15 @@ export class SettingsService {
     instagramUrl: string | null;
     facebookUrl: string | null;
     pinterestUrl: string | null;
+    faviconUrl: string | null;
+    logoUrl: string | null;
   }> {
-    const [hero, about, contact, social] = await Promise.all([
+    const [hero, about, contact, social, general] = await Promise.all([
       this.getHero(),
       this.getAbout(),
       this.getContact(),
       this.getSocial(),
+      this.getGeneral(),
     ]);
     return {
       heroTitle: hero.heroTitle,
@@ -162,6 +198,8 @@ export class SettingsService {
       instagramUrl: social.instagramUrl,
       facebookUrl: social.facebookUrl,
       pinterestUrl: social.pinterestUrl,
+      faviconUrl: general.faviconUrl,
+      logoUrl: general.logoUrl,
     };
   }
 }

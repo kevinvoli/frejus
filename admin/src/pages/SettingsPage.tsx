@@ -1,7 +1,9 @@
 import { Stack, Tabs, Title } from '@mantine/core';
 import {
   IconAddressBook,
+  IconFileText,
   IconHome,
+  IconPhoto,
   IconShare2,
   IconUser,
 } from '@tabler/icons-react';
@@ -9,6 +11,8 @@ import { HeroSettingsForm } from '../components/settings/HeroSettingsForm';
 import { AboutSettingsForm } from '../components/settings/AboutSettingsForm';
 import { ContactSettingsForm } from '../components/settings/ContactSettingsForm';
 import { SocialSettingsForm } from '../components/settings/SocialSettingsForm';
+import { GeneralSettingsForm } from '../components/settings/GeneralSettingsForm';
+import { LegalSettingsForm } from '../components/settings/LegalSettingsForm';
 
 // Un onglet par section : chaque section a sa table dédiée côté backend (voir
 // backend/src/settings) et son propre bouton "Enregistrer" — passer d'un onglet à
@@ -34,6 +38,12 @@ export function SettingsPage() {
           <Tabs.Tab value="social" leftSection={<IconShare2 size={16} />}>
             Réseaux sociaux
           </Tabs.Tab>
+          <Tabs.Tab value="general" leftSection={<IconPhoto size={16} />}>
+            Général
+          </Tabs.Tab>
+          <Tabs.Tab value="legal" leftSection={<IconFileText size={16} />}>
+            Pages légales
+          </Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="hero" pt="lg">
@@ -47,6 +57,12 @@ export function SettingsPage() {
         </Tabs.Panel>
         <Tabs.Panel value="social" pt="lg">
           <SocialSettingsForm />
+        </Tabs.Panel>
+        <Tabs.Panel value="general" pt="lg">
+          <GeneralSettingsForm />
+        </Tabs.Panel>
+        <Tabs.Panel value="legal" pt="lg">
+          <LegalSettingsForm />
         </Tabs.Panel>
       </Tabs>
     </Stack>

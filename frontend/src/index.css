@@ -666,6 +666,15 @@ footer {
     margin-bottom: 20px;
 }
 
+/* Remplace .footer-logo quand un logo est renseigné dans le panneau admin (voir
+   GeneralSettingsForm.tsx / Footer.tsx) — hauteur fixe, largeur libre. */
+.footer-logo-image {
+    height: 40px;
+    width: auto;
+    margin-bottom: 20px;
+    object-fit: contain;
+}
+
 .footer-links h4 {
     margin-bottom: 20px;
 }
@@ -695,22 +704,19 @@ footer {
     color: #999;
 }
 
-/* MÉDIATHÈQUE CLIENTE (page /?galerie=<token>, voir GalleryView.tsx) */
+/* MÉDIATHÈQUE CLIENTE (page /?galerie=<token>, voir GalleryView.tsx), page dédiée
+   d'une spécialité (voir SpecialtyDetail.tsx) et pages légales (voir LegalPage.tsx) :
+   les trois réutilisent la barre de navigation complète du site (Header.tsx, position
+   fixed) plutôt qu'un en-tête minimal, pour qu'elle ne disparaisse jamais en changeant
+   de page — .gallery-main compense donc sa hauteur avec le même décalage que .hero
+   ci-dessus (70px). */
 .gallery-view {
     min-height: 100vh;
     background-color: var(--gris-clair);
 }
 
-.gallery-header {
-    background-color: var(--blanc);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-.gallery-header-content {
-    padding: 20px;
-}
-
 .gallery-main {
+    margin-top: 70px;
     padding: 60px 20px 100px;
 }
 
@@ -729,6 +735,22 @@ footer {
     max-width: 420px;
     margin: 60px auto;
     text-align: center;
+}
+
+/* Pages légales (voir LegalPage.tsx) : simple contenu texte, largeur de lecture
+   confortable plutôt que la pleine largeur de .container. */
+.legal-page-main {
+    max-width: 760px;
+}
+
+.legal-page-main h1 {
+    margin-bottom: 30px;
+}
+
+.legal-page-content p {
+    margin-bottom: 1.2em;
+    line-height: 1.7;
+    white-space: pre-line;
 }
 
 .gallery-password h1 {

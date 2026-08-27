@@ -23,6 +23,12 @@ export interface SiteSettings {
   instagramUrl: string | null;
   facebookUrl: string | null;
   pinterestUrl: string | null;
+  // Identité visuelle globale (voir backend/src/settings/entities/general-settings.entity.ts) :
+  // favicon injecté dynamiquement (voir App.tsx) et logo affiché en pied de page
+  // (voir Footer.tsx) à la place du texte "Pixellia" tant qu'aucun logo n'est
+  // renseigné.
+  faviconUrl: string | null;
+  logoUrl: string | null;
 }
 
 // Catalogue de photos d'une spécialité : distinct de `imageUrl`, qui reste l'image de
