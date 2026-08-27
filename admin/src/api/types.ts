@@ -26,8 +26,9 @@ export interface ContactSettings {
   studioName: string | null;
   address: string | null;
   city: string | null;
-  phone: string | null;
-  email: string | null;
+  // Plusieurs numéros/emails possibles (voir backend/src/settings/entities/contact-settings.entity.ts).
+  phones: string[] | null;
+  emails: string[] | null;
   openingHours: string | null;
   updatedAt: string;
 }

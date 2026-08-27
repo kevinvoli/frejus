@@ -59,8 +59,28 @@ const Contact: React.FC<ContactProps> = ({ settings }) => {
           <div className="contact-info">
             <h3>Informations de contact</h3>
             <div className="contact-details">
-              {settings.phone && <p><strong>Téléphone:</strong> {settings.phone}</p>}
-              {settings.email && <p><strong>Email:</strong> {settings.email}</p>}
+              {settings.phones.length > 0 && (
+                <p>
+                  <strong>Téléphone{settings.phones.length > 1 ? 's' : ''}:</strong>{' '}
+                  {settings.phones.map((phone, index) => (
+                    <React.Fragment key={phone}>
+                      {index > 0 && ', '}
+                      <a href={`tel:${phone.replace(/[^+\d]/g, '')}`}>{phone}</a>
+                    </React.Fragment>
+                  ))}
+                </p>
+              )}
+              {settings.emails.length > 0 && (
+                <p>
+                  <strong>Email{settings.emails.length > 1 ? 's' : ''}:</strong>{' '}
+                  {settings.emails.map((email, index) => (
+                    <React.Fragment key={email}>
+                      {index > 0 && ', '}
+                      <a href={`mailto:${email}`}>{email}</a>
+                    </React.Fragment>
+                  ))}
+                </p>
+              )}
               {address && <p><strong>Studio:</strong> {address}</p>}
               {settings.openingHours && <p><strong>Horaires:</strong> {settings.openingHours}</p>}
             </div>

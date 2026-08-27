@@ -108,7 +108,10 @@ export class SettingsService {
   // --- Section "Studio et contact" ---
 
   async getContact(): Promise<ContactSettings> {
-    return this.getOrCreateSingleton(this.contactRepo, {});
+    return this.getOrCreateSingleton(this.contactRepo, {
+      phones: [],
+      emails: [],
+    });
   }
 
   async updateContact(dto: UpdateContactSettingsDto): Promise<ContactSettings> {
@@ -167,8 +170,8 @@ export class SettingsService {
     studioName: string | null;
     address: string | null;
     city: string | null;
-    phone: string | null;
-    email: string | null;
+    phones: string[];
+    emails: string[];
     openingHours: string | null;
     instagramUrl: string | null;
     facebookUrl: string | null;
@@ -192,8 +195,8 @@ export class SettingsService {
       studioName: contact.studioName,
       address: contact.address,
       city: contact.city,
-      phone: contact.phone,
-      email: contact.email,
+      phones: contact.phones ?? [],
+      emails: contact.emails ?? [],
       openingHours: contact.openingHours,
       instagramUrl: social.instagramUrl,
       facebookUrl: social.facebookUrl,

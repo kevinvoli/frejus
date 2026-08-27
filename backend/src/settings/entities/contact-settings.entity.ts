@@ -17,11 +17,16 @@ export class ContactSettings {
   @Column({ type: 'varchar', name: 'city', length: 255, nullable: true })
   city: string | null;
 
-  @Column({ type: 'varchar', name: 'phone', length: 50, nullable: true })
-  phone: string | null;
+  // Plusieurs numéros/emails possibles (ex. ligne fixe du studio + mobile) — voir
+  // docs/ANALYSE-PLAN-BACKEND.md, mise à jour du 27/08. `simple-json` (portable entre
+  // moteurs SQL, sérialisé/désérialisé automatiquement par TypeORM) plutôt qu'une
+  // table séparée : une simple liste de chaînes, sans besoin d'id/ordre/CRUD propre à
+  // chaque entrée.
+  @Column({ type: 'simple-json', name: 'phones', nullable: true })
+  phones: string[] | null;
 
-  @Column({ type: 'varchar', name: 'email', length: 255, nullable: true })
-  email: string | null;
+  @Column({ type: 'simple-json', name: 'emails', nullable: true })
+  emails: string[] | null;
 
   @Column({
     type: 'varchar',

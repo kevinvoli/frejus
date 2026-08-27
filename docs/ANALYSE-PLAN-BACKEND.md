@@ -654,6 +654,43 @@ par son URL ; logo affiché en pied de page à la place du texte "Pixellia" ; le
 remplies depuis l'admin puis vérifiées sur le site vitrine (contenu affiché correctement, barre de
 navigation complète présente) ; clic sur chacun des 3 liens "Legal" du pied de page vérifié.
 
+## Mise à jour du 27 août 2026 (suite) — plusieurs téléphones et emails de contact
+
+Demande client : pouvoir renseigner plusieurs numéros de téléphone et/ou plusieurs adresses
+email de contact, un studio pouvant en avoir plusieurs (ligne fixe et mobile, par exemple).
+Remplace les champs uniques `phone`/`email` de la section "Studio et contact".
+
+- **Backend** — `ContactSettings` (`contact_settings`, voir
+  `backend/src/settings/entities/contact-settings.entity.ts`) : les colonnes `phone`/`email`
+  (varchar) sont remplacées par `phones`/`emails`, deux colonnes `simple-json` (une simple liste
+  de chaînes, sérialisée/désérialisée automatiquement par TypeORM) — pas de table séparée avec
+  CRUD propre, ces listes n'ayant besoin ni d'id, ni d'ordre, ni d'aucune autre métadonnée par
+  entrée. Toujours initialisées à `[]` plutôt que `null` (voir `getContact()`), pour que le site
+  vitrine n'ait jamais à distinguer "vide" de "non renseigné" sur ces deux champs. Validation DTO :
+  chaque entrée de `emails` doit être un email valide (`@IsEmail` avec `each: true`), `phones`
+  reste en texte libre (formats internationaux variés).
+- **Panneau admin** — le formulaire "Studio et contact" remplace les deux champs texte
+  Téléphone/Email par deux `TagsInput` Mantine ("Téléphones"/"Emails de contact") : on saisit une
+  valeur puis Entrée pour l'ajouter, chaque entrée devient une puce supprimable individuellement.
+  Nécessite une petite généralisation de `useSectionSettingsForm` (partagée par tous les
+  formulaires de réglages) pour accepter des champs de type liste de chaînes en plus des champs
+  texte simples, via un paramètre optionnel de valeurs par défaut — sans impact sur les 5 autres
+  formulaires de réglages, qui continuent de fonctionner sans ce paramètre.
+- **Site vitrine** — la section "Me contacter" (`Contact.tsx`) affiche désormais la liste complète
+  des numéros et des emails renseignés (séparés par des virgules, libellé au pluriel dès qu'il y en
+  a plusieurs), chacun cliquable (`tel:`/`mailto:`) plutôt qu'une simple ligne de texte.
+
+**Changement de schéma** : les colonnes `phone`/`email` d'origine sont supprimées au profit de
+`phones`/`emails` (synchronisation TypeORM automatique) — toute valeur déjà saisie dans ces deux
+champs avant cette mise à jour est perdue et doit être ressaisie dans le panneau admin. Sans
+conséquence en pratique à ce stade du projet (pas encore de données réelles en production).
+
+**Vérification effectuée** : build backend + admin + frontend sans erreur (lint backend/admin
+également, sans nouvel avertissement). Testé en navigateur (Playwright) : ajout de 2 numéros et 2
+emails depuis le panneau admin (saisie + Entrée), sauvegarde, persistance vérifiée après
+rechargement de la page ; site vitrine vérifié affichant les 2 numéros et les 2 emails avec liens
+`tel:`/`mailto:` corrects et libellés au pluriel.
+
 ## 1. Résumé
 
 Le projet `frejus` est actuellement un **site vitrine 100 % statique** (React 18 + Vite + TypeScript) pour un photographe fictif/à personnaliser ("Pixellia Photographie"), déployé sur GitHub Pages via GitHub Actions. Il n'existe **aucun backend, aucune base de données, aucun stockage d'images et aucun formulaire fonctionnel** : tout le contenu (portfolio, spécialités, témoignages, coordonnées) est codé en dur dans les composants React, et le formulaire de contact se contente d'un `alert()` de simulation.

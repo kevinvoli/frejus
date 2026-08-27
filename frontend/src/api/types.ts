@@ -17,8 +17,9 @@ export interface SiteSettings {
   studioName: string | null;
   address: string | null;
   city: string | null;
-  phone: string | null;
-  email: string | null;
+  // Plusieurs numéros/emails possibles (voir backend/src/settings/entities/contact-settings.entity.ts).
+  phones: string[];
+  emails: string[];
   openingHours: string | null;
   instagramUrl: string | null;
   facebookUrl: string | null;

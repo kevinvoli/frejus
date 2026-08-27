@@ -54,7 +54,7 @@ Tous préfixés par `/api`. Les routes marquées 🔒 nécessitent un header
 | GET | `/settings` | Contenu éditable du site, agrégé depuis les tables ci-dessous (public, consommé par le site vitrine) — inclut `faviconUrl`/`logoUrl` de la section Général, mais pas les pages légales (voir `/settings/legal`) |
 | GET/PUT 🔒 | `/settings/hero` | Section Accueil (titre d'accroche, sous-titre, image) |
 | GET/PUT 🔒 | `/settings/about` | Section À propos (texte, photo) |
-| GET/PUT 🔒 | `/settings/contact` | Section Studio et contact (nom, adresse, ville, téléphone, email, horaires) |
+| GET/PUT 🔒 | `/settings/contact` | Section Studio et contact (nom, adresse, ville, téléphones[], emails[], horaires) |
 | GET/PUT 🔒 | `/settings/social` | Section Réseaux sociaux (Instagram, Facebook, Pinterest) |
 | GET/PUT 🔒 | `/settings/general` | Section Général (favicon, logo) |
 | GET 🔓 / PUT 🔒 | `/settings/legal` | Pages légales (Mentions légales, Politique de confidentialité, Conditions générales) — lecture publique (consommée directement par le site vitrine), écriture protégée |

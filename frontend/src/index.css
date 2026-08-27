@@ -596,6 +596,14 @@ nav a:hover {
     margin-bottom: 10px;
 }
 
+/* Téléphones/emails cliquables (tel:/mailto:, voir Contact.tsx) — même traitement
+   visuel que le texte environnant plutôt que le bleu/souligné par défaut du lien. */
+.contact-details a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+}
+
 .social-links a {
     display: inline-block;
     margin-right: 15px;
