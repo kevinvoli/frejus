@@ -5,9 +5,9 @@ import type { PortfolioItem, Specialty, SiteSettings, Testimonial } from './api/
 
 export const DEFAULT_SETTINGS: SiteSettings = {
   heroTitle: "Capturer l'instant, créer l'éternel",
-  heroSubtitle:
-    'Photographe professionnel spécialisé en portrait, mariage et paysages. Basé à Paris, disponible en France et à l\'international.',
-  heroImageUrl: null,
+  // Aucune image de repli par défaut : sans image active, Hero.tsx retombe sur le
+  // fond CSS par défaut (.hero dans index.css) sans afficher de sous-titre.
+  heroSlides: [],
   aboutText:
     "Passionné par la photographie depuis plus de 10 ans, je me spécialise dans la capture d'émotions authentiques et de moments uniques. Mon approche allie technique et sensibilité artistique pour créer des images qui racontent une histoire.\n\nDiplômé de l'École de Photographie de Paris, j'ai eu l'honneur de travailler avec des clients prestigieux et de voir mon travail publié dans plusieurs magazines nationaux.\n\nMon objectif : immortaliser vos moments les plus précieux avec authenticité et créativité.",
   aboutImageUrl: null,

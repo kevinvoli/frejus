@@ -9,9 +9,20 @@
 export interface HeroSettings {
   id: number;
   heroTitle: string | null;
-  heroSubtitle: string | null;
-  heroImageUrl: string | null;
   updatedAt: string;
+}
+
+// Une image du carousel d'accueil (voir backend/src/settings/entities/hero-slide.entity.ts) :
+// remplace depuis le 27/08 le sous-titre et l'image uniques d'origine de `HeroSettings`
+// — plusieurs images possibles, chacune activable indépendamment et avec son propre
+// sous-titre optionnel. Seul `heroTitle` ci-dessus reste unique et fixe.
+export interface HeroSlide {
+  id: number;
+  imageUrl: string;
+  subtitle: string | null;
+  active: boolean;
+  order: number;
+  createdAt: string;
 }
 
 export interface AboutSettings {

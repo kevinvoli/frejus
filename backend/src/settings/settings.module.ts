@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HeroSettings } from './entities/hero-settings.entity';
+import { HeroSlide } from './entities/hero-slide.entity';
 import { AboutSettings } from './entities/about-settings.entity';
 import { ContactSettings } from './entities/contact-settings.entity';
 import { SocialSettings } from './entities/social-settings.entity';
@@ -13,6 +14,7 @@ import { SettingsService } from './settings.service';
   imports: [
     TypeOrmModule.forFeature([
       HeroSettings,
+      HeroSlide,
       AboutSettings,
       ContactSettings,
       SocialSettings,

@@ -125,9 +125,15 @@ nav a:hover {
     text-align: center;
 }
 
-/* HERO SECTION */
+/* HERO SECTION — carousel de plusieurs images possibles depuis le 27/08 (voir
+   Hero.tsx et docs/ANALYSE-PLAN-BACKEND.md) : .hero garde son fond de repli par
+   défaut (visible tant qu'aucune image n'est activée dans le panneau admin), et
+   chaque image activée est une couche .hero-slide superposée en position absolute,
+   fondue en CSS (opacity) plutôt qu'un remplacement direct de background-image. */
 .hero {
     height: 100vh;
+    position: relative;
+    overflow: hidden;
     background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://images.unsplash.com/photo-1554048612-b6a482bc67e5?ixlib=rb-4.0.3') center/cover;
     display: flex;
     align-items: center;
@@ -135,6 +141,25 @@ nav a:hover {
     text-align: center;
     color: var(--blanc);
     margin-top: 70px;
+}
+
+.hero-slide {
+    position: absolute;
+    inset: 0;
+    background-position: center;
+    background-size: cover;
+    opacity: 0;
+    transition: opacity 1.2s ease-in-out;
+}
+
+.hero-slide-active {
+    opacity: 1;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+    padding: 0 20px;
 }
 
 .hero-content h1 {
@@ -147,6 +172,35 @@ nav a:hover {
     font-size: 1.2rem;
     margin-bottom: 30px;
     max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Puces de navigation manuelle entre les images du carousel, affichées seulement
+   s'il y a plusieurs images actives (voir Hero.tsx). */
+.hero-dots {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    z-index: 2;
+}
+
+.hero-dot {
+    width: 10px;
+    height: 10px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.hero-dot-active {
+    background-color: var(--blanc);
 }
 
 .btn {

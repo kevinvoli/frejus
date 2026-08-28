@@ -8,10 +8,21 @@
 // depuis la refonte du panneau admin du 26/08 (voir docs/ANALYSE-PLAN-BACKEND.md).
 // Plus d'`id`/`updatedAt` uniques : ces notions n'ont plus de sens pour un agrégat de
 // 4 lignes distinctes.
+// Une image du carousel d'accueil (voir backend/src/settings/entities/hero-slide.entity.ts) :
+// remplace depuis le 27/08 le sous-titre et l'image uniques d'origine — seules les
+// images activées dans le panneau admin apparaissent ici, déjà triées par ordre
+// d'affichage.
+export interface HeroSlide {
+  id: number;
+  imageUrl: string;
+  subtitle: string | null;
+}
+
 export interface SiteSettings {
+  // Unique et fixe, contrairement au sous-titre : ne change pas d'une image du
+  // carousel à l'autre (voir heroSlides ci-dessous).
   heroTitle: string | null;
-  heroSubtitle: string | null;
-  heroImageUrl: string | null;
+  heroSlides: HeroSlide[];
   aboutText: string | null;
   aboutImageUrl: string | null;
   studioName: string | null;

@@ -52,7 +52,8 @@ Tous préfixés par `/api`. Les routes marquées 🔒 nécessitent un header
 |---|---|---|
 | POST | `/auth/login` | Connexion admin, retourne un JWT |
 | GET | `/settings` | Contenu éditable du site, agrégé depuis les tables ci-dessous (public, consommé par le site vitrine) — inclut `faviconUrl`/`logoUrl` de la section Général, mais pas les pages légales (voir `/settings/legal`) |
-| GET/PUT 🔒 | `/settings/hero` | Section Accueil (titre d'accroche, sous-titre, image) |
+| GET/PUT 🔒 | `/settings/hero` | Section Accueil (titre d'accroche uniquement) |
+| GET/POST/PUT/DELETE 🔒 | `/settings/hero/slides[/:id]` | Images du carousel d'accueil (image, sous-titre optionnel, actif, ordre) — seules les images actives apparaissent dans l'agrégat public `GET /settings` |
 | GET/PUT 🔒 | `/settings/about` | Section À propos (texte, photo) |
 | GET/PUT 🔒 | `/settings/contact` | Section Studio et contact (nom, adresse, ville, téléphones[], emails[], horaires) |
 | GET/PUT 🔒 | `/settings/social` | Section Réseaux sociaux (Instagram, Facebook, Pinterest) |

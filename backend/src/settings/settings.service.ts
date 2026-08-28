@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   DeepPartial,
@@ -7,12 +7,15 @@ import {
   Repository,
 } from 'typeorm';
 import { HeroSettings } from './entities/hero-settings.entity';
+import { HeroSlide } from './entities/hero-slide.entity';
 import { AboutSettings } from './entities/about-settings.entity';
 import { ContactSettings } from './entities/contact-settings.entity';
 import { SocialSettings } from './entities/social-settings.entity';
 import { GeneralSettings } from './entities/general-settings.entity';
 import { LegalSettings } from './entities/legal-settings.entity';
 import { UpdateHeroSettingsDto } from './dto/update-hero-settings.dto';
+import { CreateHeroSlideDto } from './dto/create-hero-slide.dto';
+import { UpdateHeroSlideDto } from './dto/update-hero-slide.dto';
 import { UpdateAboutSettingsDto } from './dto/update-about-settings.dto';
 import { UpdateContactSettingsDto } from './dto/update-contact-settings.dto';
 import { UpdateSocialSettingsDto } from './dto/update-social-settings.dto';
@@ -38,6 +41,8 @@ export class SettingsService {
   constructor(
     @InjectRepository(HeroSettings)
     private readonly heroRepo: Repository<HeroSettings>,
+    @InjectRepository(HeroSlide)
+    private readonly heroSlideRepo: Repository<HeroSlide>,
     @InjectRepository(AboutSettings)
     private readonly aboutRepo: Repository<AboutSettings>,
     @InjectRepository(ContactSettings)
@@ -92,6 +97,53 @@ export class SettingsService {
   async updateHero(dto: UpdateHeroSettingsDto): Promise<HeroSettings> {
     const current = await this.getHero();
     return this.heroRepo.save(this.heroRepo.merge(current, dto));
+  }
+
+  // --- Carousel d'accueil (voir docs/ANALYSE-PLAN-BACKEND.md, ajout du 27/08) : liste
+  // de `HeroSlide`, pas de fichier à nettoyer à la suppression (même logique que pour
+  // les images uniques des autres sections — heroImageUrl d'origine, aboutImageUrl,
+  // favicon, logo — jamais nettoyées automatiquement, voir upload.controller.ts).
+
+  // Toutes les images (actives ou non) : utilisé par le panneau admin pour la gestion
+  // complète du carousel.
+  async listHeroSlides(): Promise<HeroSlide[]> {
+    return this.sortHeroSlides(await this.heroSlideRepo.find());
+  }
+
+  async addHeroSlide(dto: CreateHeroSlideDto): Promise<HeroSlide[]> {
+    await this.heroSlideRepo.save(this.heroSlideRepo.create(dto));
+    return this.listHeroSlides();
+  }
+
+  async updateHeroSlide(
+    id: number,
+    dto: UpdateHeroSlideDto,
+  ): Promise<HeroSlide[]> {
+    const slide = await this.findOneHeroSlide(id);
+    await this.heroSlideRepo.save(this.heroSlideRepo.merge(slide, dto));
+    return this.listHeroSlides();
+  }
+
+  async removeHeroSlide(id: number): Promise<void> {
+    const slide = await this.findOneHeroSlide(id);
+    await this.heroSlideRepo.remove(slide);
+  }
+
+  private async findOneHeroSlide(id: number): Promise<HeroSlide> {
+    const slide = await this.heroSlideRepo.findOne({ where: { id } });
+    if (!slide) {
+      throw new NotFoundException(`Image d'accueil ${id} introuvable`);
+    }
+    return slide;
+  }
+
+  private sortHeroSlides(slides: HeroSlide[]): HeroSlide[] {
+    return slides
+      .slice()
+      .sort(
+        (a, b) =>
+          a.order - b.order || a.createdAt.getTime() - b.createdAt.getTime(),
+      );
   }
 
   // --- Section "À propos" ---
@@ -163,8 +215,7 @@ export class SettingsService {
   // seul GET /settings comme avant.
   async get(): Promise<{
     heroTitle: string | null;
-    heroSubtitle: string | null;
-    heroImageUrl: string | null;
+    heroSlides: { id: number; imageUrl: string; subtitle: string | null }[];
     aboutText: string | null;
     aboutImageUrl: string | null;
     studioName: string | null;
@@ -179,17 +230,27 @@ export class SettingsService {
     faviconUrl: string | null;
     logoUrl: string | null;
   }> {
-    const [hero, about, contact, social, general] = await Promise.all([
-      this.getHero(),
-      this.getAbout(),
-      this.getContact(),
-      this.getSocial(),
-      this.getGeneral(),
-    ]);
+    const [hero, heroSlides, about, contact, social, general] =
+      await Promise.all([
+        this.getHero(),
+        this.listHeroSlides(),
+        this.getAbout(),
+        this.getContact(),
+        this.getSocial(),
+        this.getGeneral(),
+      ]);
     return {
       heroTitle: hero.heroTitle,
-      heroSubtitle: hero.heroSubtitle,
-      heroImageUrl: hero.heroImageUrl,
+      // Seules les images activées dans le panneau admin apparaissent dans le
+      // carousel du site vitrine ; forme publique allégée (ni `active` ni `order`,
+      // déjà appliqué par le tri de listHeroSlides()).
+      heroSlides: heroSlides
+        .filter((slide) => slide.active)
+        .map((slide) => ({
+          id: slide.id,
+          imageUrl: slide.imageUrl,
+          subtitle: slide.subtitle,
+        })),
       aboutText: about.aboutText,
       aboutImageUrl: about.aboutImageUrl,
       studioName: contact.studioName,

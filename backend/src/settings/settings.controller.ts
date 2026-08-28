@@ -1,7 +1,19 @@
-import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SettingsService } from './settings.service';
 import { UpdateHeroSettingsDto } from './dto/update-hero-settings.dto';
+import { CreateHeroSlideDto } from './dto/create-hero-slide.dto';
+import { UpdateHeroSlideDto } from './dto/update-hero-slide.dto';
 import { UpdateAboutSettingsDto } from './dto/update-about-settings.dto';
 import { UpdateContactSettingsDto } from './dto/update-contact-settings.dto';
 import { UpdateSocialSettingsDto } from './dto/update-social-settings.dto';
@@ -33,6 +45,40 @@ export class SettingsController {
   @Put('hero')
   updateHero(@Body() dto: UpdateHeroSettingsDto) {
     return this.settingsService.updateHero(dto);
+  }
+
+  // Carousel d'accueil (voir docs/ANALYSE-PLAN-BACKEND.md, ajout du 27/08) : plusieurs
+  // images activables indépendamment, chacune avec son propre sous-titre optionnel.
+  // Imbriquées sous /settings/hero comme les tarifs sous /specialties/:id (voir
+  // specialties.controller.ts) — même principe de sous-ressource avec CRUD complet.
+  // Lecture réservée au panneau admin (liste complète, actives ou non) ; le site
+  // vitrine récupère les images actives via l'agrégat public GET /settings.
+
+  @UseGuards(JwtAuthGuard)
+  @Get('hero/slides')
+  listHeroSlides() {
+    return this.settingsService.listHeroSlides();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('hero/slides')
+  addHeroSlide(@Body() dto: CreateHeroSlideDto) {
+    return this.settingsService.addHeroSlide(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('hero/slides/:id')
+  updateHeroSlide(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateHeroSlideDto,
+  ) {
+    return this.settingsService.updateHeroSlide(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('hero/slides/:id')
+  removeHeroSlide(@Param('id', ParseIntPipe) id: number) {
+    return this.settingsService.removeHeroSlide(id);
   }
 
   @UseGuards(JwtAuthGuard)

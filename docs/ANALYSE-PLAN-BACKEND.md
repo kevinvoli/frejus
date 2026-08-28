@@ -691,6 +691,59 @@ emails depuis le panneau admin (saisie + Entrée), sauvegarde, persistance véri
 rechargement de la page ; site vitrine vérifié affichant les 2 numéros et les 2 emails avec liens
 `tel:`/`mailto:` corrects et libellés au pluriel.
 
+## Mise à jour du 28 août 2026 — carousel de plusieurs images pour la section d'accueil
+
+Demande client : pouvoir ajouter plusieurs images pour la section d'accueil depuis l'onglet
+"Accueil" du panneau des réglages, les activer indépendamment pour que seules celles activées
+apparaissent au visiteur sous forme de carousel/slider. Le titre d'accroche reste unique et fixe
+quelle que soit l'image affichée, mais chaque image peut avoir (ou non) son propre sous-titre, qui
+défile avec elle. Remplace le sous-titre et l'image uniques d'origine de la section "Accueil".
+
+- **Backend** — nouvelle entité `HeroSlide` (`hero_slides`, voir
+  `backend/src/settings/entities/hero-slide.entity.ts`) : `imageUrl` (requis), `subtitle` (texte
+  libre, optionnel), `active` (booléen, `true` par défaut) et `order`. Table indépendante plutôt
+  que rattachée à `HeroSettings` par clé étrangère : `HeroSettings` reste une ligne singleton (id
+  fixe = 1) qui ne contient désormais plus que `heroTitle` — le sous-titre et l'image uniques
+  d'origine sont supprimés de cette table, remplacés par la liste `HeroSlide`. Nouvelles routes
+  imbriquées `GET/POST/PUT/DELETE /settings/hero/slides[/:id]`, protégées JWT comme le reste du
+  panneau admin (même principe que les tarifs imbriqués sous `/specialties/:id/tariffs`, voir mise
+  à jour du 27/08 sur la page dédiée d'une spécialité) ; la lecture complète (actives ou non) est
+  réservée à l'admin. L'agrégat public `GET /settings` expose `heroSlides` : uniquement les images
+  actives, triées par ordre d'affichage, sous une forme allégée (`id`, `imageUrl`, `subtitle` —
+  sans `active` ni `order`, informations de gestion interne).
+- **Panneau admin** — la section "Accueil" du formulaire de réglages ne contient plus que le
+  titre d'accroche ; un nouveau bloc "Carousel d'accueil" en dessous (nouveau composant
+  `HeroSlidesManager.tsx`) liste toutes les images (tableau : miniature, sous-titre, ordre,
+  interrupteur actif/inactif, modifier/supprimer) avec un bouton "Ajouter une image" ouvrant une
+  fenêtre modale (upload d'image, sous-titre optionnel, actif, ordre). Contrairement aux autres
+  sections de réglages, chaque action ici est un appel API immédiat (ajout, modification,
+  activation, suppression), pas un formulaire à enregistrer d'un bloc — même principe que la
+  grille tarifaire d'une spécialité.
+- **Site vitrine** — `Hero.tsx` devient un carousel : une couche `.hero-slide` par image, fondues
+  en CSS (`opacity`, transition 1,2 s) plutôt qu'un remplacement direct de `background-image`,
+  défilement automatique toutes les 6 secondes lorsqu'il y a plusieurs images actives, plus des
+  puces de navigation manuelle en bas de la section. Le titre d'accroche est rendu une seule fois,
+  en dehors des couches d'images, et ne bouge donc jamais ; seul le sous-titre affiché change avec
+  l'image active (masqué si l'image n'en a pas). Sans aucune image active, la section retombe sur
+  le fond de repli CSS déjà présent par défaut (`.hero` dans `index.css`), sans sous-titre — un
+  comportement inchangé par rapport à avant cette mise à jour.
+
+**Changement de schéma** : les colonnes `hero_subtitle`/`hero_image_url` d'origine sont
+supprimées (synchronisation TypeORM automatique) au profit de la nouvelle table `hero_slides` —
+tout sous-titre/image déjà saisi avant cette mise à jour est perdu et doit être ressaisi comme
+première image du carousel dans le panneau admin. Sans conséquence en pratique à ce stade du
+projet (pas encore de données réelles en production).
+
+**Vérification effectuée** : build backend + admin + frontend sans erreur (lint backend/admin
+également, sans nouvel avertissement au-delà des avertissements préexistants déjà présents sur ce
+même schéma ailleurs dans le panneau admin). Testé en navigateur (Playwright) : modification du
+titre d'accroche, ajout de 3 images avec upload réel (2 avec sous-titre, 1 sans), désactivation
+d'une image depuis l'interrupteur — vérifié que l'agrégat public `GET /settings` n'expose alors
+que les 2 images actives restantes. Côté site vitrine : titre fixe affiché en permanence,
+sous-titre changeant correctement d'une image à l'autre (y compris son absence sur l'image sans
+sous-titre), navigation manuelle par les puces vérifiée, et défilement automatique confirmé après
+l'intervalle de 6 secondes (retour à la première image après la seconde).
+
 ## 1. Résumé
 
 Le projet `frejus` est actuellement un **site vitrine 100 % statique** (React 18 + Vite + TypeScript) pour un photographe fictif/à personnaliser ("Pixellia Photographie"), déployé sur GitHub Pages via GitHub Actions. Il n'existe **aucun backend, aucune base de données, aucun stockage d'images et aucun formulaire fonctionnel** : tout le contenu (portfolio, spécialités, témoignages, coordonnées) est codé en dur dans les composants React, et le formulaire de contact se contente d'un `alert()` de simulation.
