@@ -40,10 +40,15 @@ import {
   uploadGalleryMedia,
 } from '../api/client';
 import { MediaType, type ClientGallery } from '../api/types';
+import { formatBytes } from '../utils/formatBytes';
 
-// Doit rester cohérent avec ALLOWED_MIME_TYPES dans
-// backend/src/galleries/galleries.controller.ts — le serveur reste la seule source
-// de vérité (ce filtrage côté client n'est qu'un confort immédiat).
+// Doit rester cohérent avec ALLOWED_MIME_TYPES et MAX_PHOTO_SIZE_BYTES /
+// MAX_VIDEO_SIZE_BYTES dans backend/src/galleries/galleries.service.ts — le serveur
+// reste la seule source de vérité (ce filtrage côté client n'est qu'un confort
+// immédiat). Deux plafonds distincts (une vidéo est naturellement bien plus
+// volumineuse qu'une photo) : comme le composant Dropzone n'accepte qu'une seule
+// valeur pour `maxSize`, celle-ci est réglée sur le plafond vidéo (le plus haut), et
+// le plafond photo est revérifié à la main dans handleDrop ci-dessous.
 const ALLOWED_MIME_TYPES = [
   'image/jpeg',
   'image/png',
@@ -53,12 +58,8 @@ const ALLOWED_MIME_TYPES = [
   'video/quicktime',
   'video/webm',
 ];
-const MAX_SIZE_BYTES = 200 * 1024 * 1024;
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
-}
+const MAX_PHOTO_SIZE_BYTES = 50 * 1024 * 1024; // 50 Mo
+const MAX_VIDEO_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 Go
 
 export function GalleryDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -90,13 +91,32 @@ export function GalleryDetailPage() {
 
   async function handleDrop(files: File[]) {
     if (!id || files.length === 0) return;
+
+    // Le composant Dropzone ne peut appliquer qu'un seul plafond de taille (voir
+    // maxSize ci-dessous, réglé sur le plafond vidéo) : on filtre donc ici les photos
+    // qui dépassent leur propre plafond, plus bas, avant l'envoi.
+    const tooLarge = files.filter(
+      (file) => !file.type.startsWith('video/') && file.size > MAX_PHOTO_SIZE_BYTES,
+    );
+    const toUpload = files.filter((file) => !tooLarge.includes(file));
+
+    if (tooLarge.length > 0) {
+      notifications.show({
+        color: 'red',
+        title: 'Fichier(s) refusé(s)',
+        message: `${tooLarge.map((file) => file.name).join(', ')} : 50 Mo maximum pour une photo.`,
+      });
+    }
+
+    if (toUpload.length === 0) return;
+
     setUploading(true);
     try {
-      await uploadGalleryMedia(Number(id), files);
+      await uploadGalleryMedia(Number(id), toUpload);
       notifications.show({
         color: 'green',
         title: 'Envoyé',
-        message: `${files.length} fichier(s) ajouté(s) à la galerie.`,
+        message: `${toUpload.length} fichier(s) ajouté(s) à la galerie.`,
       });
       await load();
     } catch (err) {
@@ -230,7 +250,7 @@ export function GalleryDetailPage() {
         onReject={handleReject}
         loading={uploading}
         accept={ALLOWED_MIME_TYPES}
-        maxSize={MAX_SIZE_BYTES}
+        maxSize={MAX_VIDEO_SIZE_BYTES}
       >
         <Group justify="center" gap="md" mih={120} style={{ pointerEvents: 'none' }}>
           <Dropzone.Accept>
@@ -247,7 +267,7 @@ export function GalleryDetailPage() {
               Glissez des photos ou vidéos ici, ou cliquez pour parcourir
             </Text>
             <Text size="xs" c="dimmed">
-              JPEG, PNG, WEBP, GIF, MP4, MOV, WEBM — 200 Mo max par fichier
+              JPEG, PNG, WEBP, GIF — 50 Mo max · MP4, MOV, WEBM — 2 Go max
             </Text>
           </div>
         </Group>
@@ -299,7 +319,7 @@ export function GalleryDetailPage() {
                       <IconPhoto size={12} />
                     )}
                     <Text size="xs" c="dimmed">
-                      {formatSize(item.sizeBytes)}
+                      {formatBytes(item.sizeBytes)}
                     </Text>
                   </Group>
                 </Stack>

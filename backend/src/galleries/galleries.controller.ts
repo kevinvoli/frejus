@@ -23,7 +23,7 @@ import { mkdirSync } from 'fs';
 import archiver from 'archiver';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { assertUploadAllowed } from '../common/disk-usage';
-import { GalleriesService } from './galleries.service';
+import { GalleriesService, MAX_VIDEO_SIZE_BYTES } from './galleries.service';
 import { CreateGalleryDto } from './dto/create-gallery.dto';
 import { UpdateGalleryDto } from './dto/update-gallery.dto';
 import { VerifyGalleryPasswordDto } from './dto/verify-gallery-password.dto';
@@ -41,10 +41,12 @@ const ALLOWED_MIME_TYPES = [
   'video/quicktime',
   'video/webm',
 ];
-// Limite unique (et non 8 Mo comme pour les images du site vitrine) : les livrables
-// client sont souvent des photos pleine résolution, et une vidéo peut légitimement
-// dépasser quelques Mo — voir la décision du client (200 Mo max par fichier).
-const MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024;
+// Multer n'applique qu'une seule limite de taille par interceptor : on la règle donc
+// sur le plafond le plus haut des deux (vidéo, 2 Go — voir MAX_PHOTO_SIZE_BYTES et
+// MAX_VIDEO_SIZE_BYTES dans galleries.service.ts) pour ne jamais bloquer un upload
+// vidéo légitime au niveau du flux. Le plafond spécifique aux photos (50 Mo) est
+// revérifié une fois le fichier écrit sur le disque, dans GalleriesService.addMedia().
+const MAX_FILE_SIZE_BYTES = MAX_VIDEO_SIZE_BYTES;
 const MAX_FILES_PER_UPLOAD = 100;
 
 @Controller('galleries')

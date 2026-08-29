@@ -35,7 +35,8 @@ const ALLOWED_MIME_TYPES = [
   'image/webp',
   'image/gif',
 ];
-const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024; // 8 Mo
+// 50 Mo — demande client du 29/08 (voir docs/ANALYSE-PLAN-BACKEND.md).
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 Mo
 const MAX_FILES_PER_UPLOAD = 30;
 
 @Controller('specialties')

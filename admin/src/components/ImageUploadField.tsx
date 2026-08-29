@@ -11,7 +11,10 @@ interface ImageUploadFieldProps {
   onChange: (url: string | null) => void;
 }
 
-const MAX_SIZE_BYTES = 8 * 1024 * 1024;
+// Doit rester cohérent avec MAX_FILE_SIZE_BYTES dans backend/src/upload/upload.controller.ts
+// — le serveur reste la seule source de vérité (ce filtrage côté client n'est qu'un
+// confort immédiat).
+const MAX_SIZE_BYTES = 50 * 1024 * 1024;
 
 export function ImageUploadField({ label, value, onChange }: ImageUploadFieldProps) {
   const [uploading, setUploading] = useState(false);
@@ -76,7 +79,7 @@ export function ImageUploadField({ label, value, onChange }: ImageUploadFieldPro
               <IconPhoto size={28} />
             </Dropzone.Idle>
             <Text size="sm" c="dimmed">
-              Glissez une image ici, ou cliquez pour parcourir (8 Mo max)
+              Glissez une image ici, ou cliquez pour parcourir (50 Mo max)
             </Text>
           </Group>
         </Dropzone>

@@ -21,7 +21,9 @@ const ALLOWED_MIME_TYPES = [
   'image/webp',
   'image/gif',
 ];
-const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024; // 8 Mo
+// 50 Mo — demande client du 29/08 (voir docs/ANALYSE-PLAN-BACKEND.md), même plafond
+// que pour les autres uploads d'images du site (catalogue de spécialités, médiathèque).
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 Mo
 
 // Upload d'images depuis le panneau admin (photo du portfolio, image "à propos", etc.).
 // MVP : stockage sur le disque local du conteneur/VPS (volume Docker persistant).

@@ -32,7 +32,12 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   const port = config.get<number>('PORT', 3000);
-  await app.listen(port);
+  const server = await app.listen(port);
+
+  // Le délai par défaut de Node (5 minutes) peut être trop court pour l'upload d'une
+  // vidéo jusqu'à 2 Go sur une connexion lente (voir galleries.controller.ts, demande
+  // client du 29/08) : on l'augmente pour ne pas couper la requête en cours de route.
+  server.requestTimeout = 30 * 60 * 1000; // 30 min
 
   console.log(`frejus-backend démarré sur http://localhost:${port}/api`);
 }

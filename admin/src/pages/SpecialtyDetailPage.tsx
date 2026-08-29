@@ -34,10 +34,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { apiFetch, ApiError, assetUrl, uploadSpecialtyPhotos } from '../api/client';
 import type { Specialty, SpecialtyTariff } from '../api/types';
 
-// Doit rester cohérent avec ALLOWED_MIME_TYPES dans
+// Doit rester cohérent avec ALLOWED_MIME_TYPES et MAX_FILE_SIZE_BYTES dans
 // backend/src/specialties/specialties.controller.ts — le serveur reste la seule
 // source de vérité (ce filtrage côté client n'est qu'un confort immédiat).
-const MAX_SIZE_BYTES = 8 * 1024 * 1024;
+const MAX_SIZE_BYTES = 50 * 1024 * 1024;
 
 interface TariffFormValues {
   name: string;
@@ -250,7 +250,7 @@ export function SpecialtyDetailPage() {
               Glissez des photos ici, ou cliquez pour parcourir
             </Text>
             <Text size="xs" c="dimmed">
-              JPEG, PNG, WEBP, GIF — 8 Mo max par fichier
+              JPEG, PNG, WEBP, GIF — 50 Mo max par fichier
             </Text>
           </div>
         </Group>

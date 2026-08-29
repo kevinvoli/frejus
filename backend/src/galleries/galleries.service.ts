@@ -41,6 +41,16 @@ const GALLERY_CODE_LENGTH = 8;
 const GALLERY_USAGE_SCOPE = 'gallery-usage';
 const GALLERY_USAGE_EXPIRES_IN = '30d';
 
+// Limites de taille par fichier — demande client du 29/08 (voir
+// docs/ANALYSE-PLAN-BACKEND.md) : une vidéo est naturellement bien plus volumineuse
+// qu'une photo, d'où deux plafonds distincts plutôt qu'un seul commun. Multer
+// n'appliquant qu'une seule limite de taille par interceptor (voir
+// `limits.fileSize` dans galleries.controller.ts, réglée sur le plafond vidéo pour ne
+// jamais couper un upload légitime en cours de flux), on revérifie ici chaque fichier
+// selon son propre type une fois écrit sur le disque.
+export const MAX_PHOTO_SIZE_BYTES = 50 * 1024 * 1024; // 50 Mo
+export const MAX_VIDEO_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 Go
+
 export interface GalleryAccessPayload {
   scope: string;
   galleryId: number;
@@ -168,18 +178,30 @@ export class GalleriesService {
     await this.findOneEntity(galleryId); // 404 si la galerie n'existe pas
 
     // multer a déjà écrit les fichiers sur le disque à ce stade (l'interceptor
-    // s'exécute avant le handler) : si le quota du projet est dépassé, on doit donc
+    // s'exécute avant le handler) : toute validation qui échoue ici doit donc d'abord
     // nettoyer ces fichiers fraîchement écrits avant de laisser l'exception remonter,
     // pour ne jamais laisser de fichier orphelin (sans ligne en base) sur le disque.
+
+    // La limite de taille appliquée par multer (`limits.fileSize`, voir
+    // galleries.controller.ts) est réglée sur le plafond vidéo (2 Go) pour laisser
+    // passer les vidéos : on revérifie donc ici qu'une photo ne dépasse pas son propre
+    // plafond, plus bas (50 Mo).
+    const oversized = files.find(
+      (file) =>
+        !file.mimetype.startsWith('video/') && file.size > MAX_PHOTO_SIZE_BYTES,
+    );
+    if (oversized) {
+      await this.cleanupUploadedFiles(files);
+      throw new BadRequestException(
+        `Fichier "${oversized.originalname}" trop volumineux : 50 Mo maximum pour une photo`,
+      );
+    }
+
     const additionalBytes = files.reduce((sum, file) => sum + file.size, 0);
     try {
       await this.storageService.assertWithinMediaQuota(additionalBytes);
     } catch (err) {
-      await Promise.all(
-        files.map((file) =>
-          this.deleteFileQuietly(`/uploads/galleries/${file.filename}`),
-        ),
-      );
+      await this.cleanupUploadedFiles(files);
       throw err;
     }
 
@@ -438,6 +460,16 @@ export class GalleriesService {
       throw new BadRequestException('Chemin de fichier invalide');
     }
     return join(process.cwd(), fileUrl);
+  }
+
+  private async cleanupUploadedFiles(
+    files: Express.Multer.File[],
+  ): Promise<void> {
+    await Promise.all(
+      files.map((file) =>
+        this.deleteFileQuietly(`/uploads/galleries/${file.filename}`),
+      ),
+    );
   }
 
   private async deleteFileQuietly(fileUrl: string): Promise<void> {
